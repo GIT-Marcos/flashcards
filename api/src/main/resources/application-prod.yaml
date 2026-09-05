@@ -35,7 +35,7 @@ application:
 logging:
   level:
     root: WARN
-    com.usuario.flashcards: WARN
+    com.cards.api: WARN
     org.springframework.web.servlet.mvc.method.annotation.ExceptionHandlerExceptionResolver: ERROR
   pattern:
     console: "%d{yyyy-MM-dd'T'HH:mm:ss.SSSZ} %5level [%thread] %logger{36} - %msg%n"

@@ -151,7 +151,7 @@ springdoc:
     path: /swagger-ui.html
     operations-sorter: method
     tags-sorter: alpha
-  packages-to-scan: com.usuario.flashcards.controller
+  packages-to-scan: com.cards.api.controller
   cache:
     disabled: true
   show-actuator: false
