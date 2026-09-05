@@ -1,9 +1,9 @@
 # CONNECTION
 spring:
   datasource:
-    url: jdbc:postgresql://localhost:5433/flashcards_db
-    username: postgres
-    password: password
+    url: ${DB_URL}
+    username: ${DB_USER}
+    password: ${DB_PASSWORD}
 
   # ---- JPA ----
   jpa:
