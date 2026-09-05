@@ -1,0 +1,82 @@
+spring:
+  flyway:
+    locations: classpath:db/migration
+    placeholders:
+      ADMIN_USERNAME: admin
+      ADMIN_EMAIL: admin@test.com
+      ADMIN_PSW_HASH: $2a$12$testAdminPasswordHashPlaceholder
+      ADMIN_ZONE: UTC
+      TEST_USERNAME: test_user
+      TEST_USER_EMAIL: test_user@test.com
+      TEST_USER_PSW_HASH: $2a$12$testUserPasswordHashPlaceholder
+      TEST_USER_ZONE: UTC
+  jpa:
+    show-sql: false
+    properties:
+      hibernate:
+        format_sql: false
+
+application:
+  security:
+    jwt:
+      secret-key: test-jwt-secret-key-for-unit-tests-only-not-for-production
+  notifications:
+    from-address: test@flashcards.com
+
+api:
+  cors:
+    allowed-origins: http://localhost:5173
+
+api-key:
+  encryption:
+    # AES-256 key (32 bytes), Base64-encoded. Must be valid for AesEncryptionConverter.
+    # Generate with: openssl rand -base64 32
+    secret: ${API_KEY_ENCRYPTION_SECRET:MDEyMzQ1Njc4OTAxMjM0NTY3ODkwMTIzNDU2Nzg5MDE=}
+
+maileroo:
+  api-key: test-maileroo-api-key
+  webhook-secret: test-maileroo-webhook-secret
+
+rate-limiter:
+  auth:
+    login: { capacity: 5, refill-tokens: 1, refill-period: 10s }
+    signup: { capacity: 5, refill-tokens: 1, refill-period: 10s }
+    confirm: { capacity: 100, refill-tokens: 10, refill-period: 10s }
+    refresh-token: { capacity: 10, refill-tokens: 2, refill-period: 10s }
+    logout: { capacity: 20, refill-tokens: 5, refill-period: 10s }
+    forgot-password: { capacity: 3, refill-tokens: 1, refill-period: 600s }
+    reset-password: { capacity: 5, refill-tokens: 1, refill-period: 60s }
+
+app:
+  async:
+    update-last-login:
+      core-pool-size: 2
+      max-pool-size: 2
+      queue-capacity: 100
+    mail:
+      core-pool-size: 3
+      max-pool-size: 5
+      queue-capacity: 50
+    system-events:
+      core-pool-size: 2
+      max-pool-size: 10
+      queue-capacity: 500
+    default-pool:
+      core-pool-size: 4
+      max-pool-size: 8
+      queue-capacity: 200
+
+management:
+  metrics:
+    auth:
+      username: test-admin
+      password: test-secret
+
+logging:
+  level:
+    root: WARN
+    com.cards.api: WARN
+    org.springframework: WARN
+    org.hibernate: WARN
+  pattern:
+    console: "%d{HH:mm:ss.SSS} %5level %logger{0} - %msg%n"
