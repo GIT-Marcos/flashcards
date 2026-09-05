@@ -1,0 +1,39 @@
+# render.yaml — Flashcards API en Render + Supabase (PostgreSQL externo)
+services:
+  - type: web
+    name: flashcards-api
+    runtime: docker
+    region: ohio
+    plan: free
+    branch: main
+    autoDeployTrigger: checksPass
+    healthCheckPath: /actuator/health
+    envVars:
+      - key: APP_PROFILE
+        value: free
+      - key: DB_URL
+        sync: false
+      - key: DB_USER
+        sync: false
+      - key: DB_PASSWORD
+        sync: false
+      - key: JWT_SECRET_KEY
+        sync: false
+      - key: ADMIN_USERNAME
+        value: admin
+      - key: ADMIN_EMAIL
+        sync: false
+      - key: ADMIN_PSW_HASH
+        sync: false
+      - key: ALLOWED_ORIGINS
+        sync: false
+      - key: MAILEROO_API_KEY
+        sync: false
+      - key: MAILEROO_WEBHOOK_SECRET
+        sync: false
+      - key: APP_URL
+        sync: false
+      - key: NOTIFY_FROM_ADDRESS
+        sync: false
+      - key: NOTIFY_FROM_NAME
+        sync: false
