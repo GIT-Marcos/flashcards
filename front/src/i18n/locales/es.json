@@ -190,11 +190,7 @@
     "frontMax": "El anverso debe tener como máximo 255 caracteres",
     "backRequired": "El reverso es obligatorio",
     "backMax": "El reverso debe tener como máximo 5000 caracteres",
-    "currentPasswordRequired": "La contraseña actual es obligatoria",
-    "promptRequired": "La descripción del tema es obligatoria",
-    "promptMax": "La descripción del tema debe tener como máximo 2000 caracteres",
-    "providerRequired": "El proveedor es obligatorio",
-    "apiKeyRequired": "La clave API es obligatoria"
+    "currentPasswordRequired": "La contraseña actual es obligatoria"
   },
   "toast": {
     "welcomeBack": "¡Bienvenido de nuevo!",
@@ -236,40 +232,5 @@
     "addFirstCard": "Añadir primera tarjeta",
     "noPendingCards": "No hay tarjetas pendientes",
     "noPendingCardsDesc": "No hay tarjetas pendientes de revisión. ¡Vuelve más tarde!"
-  },
-  "ai": {
-    "orGenerateWithAI": "O generar con IA",
-    "generateFromFile": "Generar desde archivo",
-    "generateFromTopic": "Generar desde tema",
-    "generateCards": "Generar con IA",
-    "selectFile": "Seleccionar archivo (.txt o .pdf)",
-    "fileHint": "Sube un archivo de texto o PDF para extraer contenido",
-    "topicPrompt": "Descripción del tema",
-    "topicPromptPlaceholder": "ej., Vocabulario de español para principiantes",
-    "provider": "Proveedor de IA",
-    "model": "Modelo (opcional)",
-    "modelHint": "Requerido para OpenRouter. Ejemplos: gpt-4o-mini, claude-sonnet-4-0",
-    "generate": "Generar",
-    "cardsGenerated": "{{count}} tarjetas creadas ({{skipped}} omitidas)",
-    "deckGenerated": "Mazo creado con {{count}} tarjetas ({{skipped}} omitidas)",
-    "generationFailed": "Error en la generación con IA",
-    "noFileSelected": "Selecciona un archivo",
-    "modelRequiredForOpenRouter": "El modelo es requerido para OpenRouter",
-    "apiKeys": "Claves API de IA",
-    "apiKeysDesc": "Gestiona tus claves de API de proveedores de IA",
-    "noApiKeys": "Aún no hay claves API configuradas",
-    "addApiKey": "Añadir clave API",
-    "keyAlias": "Clave",
-    "keyCreated": "Clave API añadida correctamente",
-    "keyDeleted": "Clave API eliminada",
-    "deleteApiKey": "Eliminar Clave API",
-    "deleteKeyConfirm": "¿Estás seguro de que quieres eliminar esta clave API?",
-    "keyAlreadyExists": "Ya existe una clave API para este proveedor",
-    "providerOpenai": "OpenAI",
-    "providerAnthropic": "Anthropic",
-    "providerGoogle": "Google AI",
-    "providerMistral": "Mistral AI",
-    "providerOpenrouter": "OpenRouter",
-    "defaultModelHint": "Usando {{provider}} {{model}}"
   }
 }

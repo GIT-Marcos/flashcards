@@ -2,49 +2,26 @@ import {useEffect, useMemo, useState} from 'react';
 import {useNavigate} from 'react-router-dom';
 import {useMutation, useQuery, useQueryClient} from '@tanstack/react-query';
 import {deleteMe, getMe, updateMe} from '@/api/users.api';
-import {createApiKey, deleteApiKey, getApiKeys} from '@/api/api-keys.api';
 import {useAuth} from '@/hooks/useAuth';
 import {useTimeZone} from '@/hooks/useTimeZone';
 import {Input} from '@/components/ui/Input';
 import {Select} from '@/components/ui/Select';
 import {Button} from '@/components/ui/Button';
 import {Card} from '@/components/ui/Card';
-import {SkeletonCard, SkeletonList} from '@/components/ui/Skeleton';
+import {SkeletonCard} from '@/components/ui/Skeleton';
 import {ErrorState} from '@/components/shared/ErrorState';
 import {ConfirmDialog} from '@/components/shared/ConfirmDialog';
 import {
     type ChangePasswordFormData,
     changePasswordSchema,
-    type CreateApiKeyFormData,
-    createApiKeySchema,
     type ProfileFormData,
     profileSchema,
     translateFieldErrors,
 } from '@/lib/validators';
 import {sanitizeHtml} from '@/lib/sanitize';
-import {formatDate} from '@/lib/utils';
 import {toast} from 'sonner';
 import {useTranslation} from 'react-i18next';
 import i18n from '@/i18n/config';
-import type {AxiosError} from 'axios';
-import type {ProblemDetail} from '@/types/api.types';
-import type {ApiKeyResponse} from '@/types/ai.types';
-
-const PROVIDER_OPTIONS: Array<{ value: string; labelKey: string }> = [
-    {value: 'OPENAI', labelKey: 'ai:providerOpenai'},
-    {value: 'ANTHROPIC', labelKey: 'ai:providerAnthropic'},
-    {value: 'GOOGLE', labelKey: 'ai:providerGoogle'},
-    {value: 'MISTRAL', labelKey: 'ai:providerMistral'},
-    {value: 'OPENROUTER', labelKey: 'ai:providerOpenrouter'},
-];
-
-const PROVIDER_ICON: Record<string, string> = {
-    OPENAI: '🤖',
-    ANTHROPIC: '🎭',
-    GOOGLE: '🔮',
-    MISTRAL: '🌬️',
-    OPENROUTER: '🔗',
-};
 
 export function SettingsPage() {
     const {t} = useTranslation();
@@ -83,56 +60,6 @@ export function SettingsPage() {
     const [passwordErrors, setPasswordErrors] = useState<Partial<Record<string, string>>>({});
 
     const [deleteConfirm, setDeleteConfirm] = useState(false);
-
-    const [apiKeyForm, setApiKeyForm] = useState<CreateApiKeyFormData>({provider: 'OPENAI', apiKey: ''});
-    const [apiKeyErrors, setApiKeyErrors] = useState<Partial<Record<string, string>>>({});
-    const [deleteKeyConfirm, setDeleteKeyConfirm] = useState<ApiKeyResponse | null>(null);
-
-    const apiKeysQuery = useQuery({
-        queryKey: ['api-keys'],
-        queryFn: getApiKeys,
-    });
-
-    const createApiKeyMutation = useMutation({
-        mutationFn: (data: CreateApiKeyFormData) =>
-            createApiKey({
-                provider: data.provider as 'OPENAI' | 'ANTHROPIC' | 'GOOGLE' | 'MISTRAL' | 'OPENROUTER',
-                apiKey: sanitizeHtml(data.apiKey)
-            }),
-        onSuccess: () => {
-            queryClient.invalidateQueries({queryKey: ['api-keys']});
-            setApiKeyForm({provider: 'OPENAI', apiKey: ''});
-            setApiKeyErrors({});
-            toast.success(t('ai:keyCreated'));
-        },
-        onError: (error: AxiosError<ProblemDetail>) => {
-            if (error.response?.status === 409) {
-                toast.error(t('ai:keyAlreadyExists'));
-            } else {
-                toast.error(error.response?.data?.detail || t('error:somethingWentWrong'));
-            }
-        },
-    });
-
-    const deleteApiKeyMutation = useMutation({
-        mutationFn: (keyId: number) => deleteApiKey(keyId),
-        onSuccess: () => {
-            queryClient.invalidateQueries({queryKey: ['api-keys']});
-            setDeleteKeyConfirm(null);
-            toast.success(t('ai:keyDeleted'));
-        },
-    });
-
-    const handleAddApiKey = (e: React.FormEvent) => {
-        e.preventDefault();
-        const result = createApiKeySchema.safeParse(apiKeyForm);
-        if (!result.success) {
-            setApiKeyErrors(translateFieldErrors(t, result.error));
-            return;
-        }
-        setApiKeyErrors({});
-        createApiKeyMutation.mutate(result.data);
-    };
 
     useEffect(() => {
         if (user) {
@@ -386,94 +313,6 @@ export function SettingsPage() {
                     ]}
                 />
             </Card>
-
-            {/* AI API Keys */}
-            <Card className="mb-6">
-                <h2 className="text-lg font-semibold text-slate-900 mb-1">{t('ai:apiKeys')}</h2>
-                <p className="text-sm text-slate-500 mb-4">{t('ai:apiKeysDesc')}</p>
-
-                {apiKeysQuery.isLoading && <SkeletonList count={3}/>}
-
-                {apiKeysQuery.isError && !apiKeysQuery.data && (
-                    <ErrorState onRetry={() => apiKeysQuery.refetch()}/>
-                )}
-
-                {apiKeysQuery.data && apiKeysQuery.data.length === 0 && (
-                    <p className="text-sm text-slate-400 mb-4">{t('ai:noApiKeys')}</p>
-                )}
-
-                {apiKeysQuery.data && apiKeysQuery.data.length > 0 && (
-                    <div className="space-y-2 mb-4">
-                        {apiKeysQuery.data.map((key) => (
-                            <div key={key.id}
-                                 className="flex items-center justify-between rounded-lg border border-slate-200 px-3 py-2.5">
-                                <div className="flex items-center gap-2.5">
-                                    <span className="text-lg">{PROVIDER_ICON[key.provider]}</span>
-                                    <span className="text-sm font-medium text-slate-700">{key.provider}</span>
-                                    <span className="text-sm text-slate-400 font-mono">{key.keyAlias}</span>
-                                    <span className="text-xs text-slate-400">{formatDate(key.createdAt)}</span>
-                                </div>
-                                <button
-                                    onClick={() => setDeleteKeyConfirm(key)}
-                                    className="p-1.5 rounded-lg hover:bg-red-50 text-slate-400 hover:text-red-500 transition-colors"
-                                    aria-label={t('ai:keyDeleted')}
-                                >
-                                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"
-                                         strokeWidth={2}>
-                                        <path strokeLinecap="round" strokeLinejoin="round"
-                                              d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
-                                    </svg>
-                                </button>
-                            </div>
-                        ))}
-                    </div>
-                )}
-
-                <form onSubmit={handleAddApiKey} className="flex items-end gap-3">
-                    <div className="flex-1">
-                        <Select
-                            label={t('ai:provider')}
-                            value={apiKeyForm.provider}
-                            onChange={(e) => {
-                                setApiKeyForm((p) => ({...p, provider: e.target.value}));
-                                setApiKeyErrors((p) => ({...p, provider: undefined}));
-                            }}
-                            options={PROVIDER_OPTIONS.map(p => ({value: p.value, label: t(p.labelKey)}))}
-                            error={apiKeyErrors.provider}
-                            disabled={createApiKeyMutation.isPending}
-                        />
-                    </div>
-                    <div className="flex-[2]">
-                        <Input
-                            label={t('ai:addApiKey')}
-                            type="password"
-                            value={apiKeyForm.apiKey}
-                            onChange={(e) => {
-                                setApiKeyForm((p) => ({...p, apiKey: e.target.value}));
-                                setApiKeyErrors((p) => ({...p, apiKey: undefined}));
-                            }}
-                            error={apiKeyErrors.apiKey}
-                            disabled={createApiKeyMutation.isPending}
-                            placeholder="sk-..."
-                        />
-                    </div>
-                    <Button type="submit" isLoading={createApiKeyMutation.isPending} className="shrink-0">
-                        {t('ai:addApiKey')}
-                    </Button>
-                </form>
-            </Card>
-
-            <ConfirmDialog
-                isOpen={deleteKeyConfirm !== null}
-                onClose={() => setDeleteKeyConfirm(null)}
-                onConfirm={() => {
-                    if (deleteKeyConfirm) deleteApiKeyMutation.mutate(deleteKeyConfirm.id);
-                }}
-                title={t('ai:deleteApiKey')}
-                message={t('ai:deleteKeyConfirm')}
-                confirmLabel={t('common:delete')}
-                isLoading={deleteApiKeyMutation.isPending}
-            />
 
             {/* Danger Zone */}
             <Card className="border-red-200">

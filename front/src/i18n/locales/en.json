@@ -190,11 +190,7 @@
     "frontMax": "Front must be at most 255 characters",
     "backRequired": "Back is required",
     "backMax": "Back must be at most 5000 characters",
-    "currentPasswordRequired": "Current password is required",
-    "promptRequired": "Topic description is required",
-    "promptMax": "Topic description must be at most 2000 characters",
-    "providerRequired": "Provider is required",
-    "apiKeyRequired": "API key is required"
+    "currentPasswordRequired": "Current password is required"
   },
   "toast": {
     "welcomeBack": "Welcome back!",
@@ -236,40 +232,5 @@
     "addFirstCard": "Add first card",
     "noPendingCards": "No pending cards",
     "noPendingCardsDesc": "No cards are due for review. Come back later!"
-  },
-  "ai": {
-    "orGenerateWithAI": "Or generate with AI",
-    "generateFromFile": "Generate from file",
-    "generateFromTopic": "Generate from topic",
-    "generateCards": "Generate with AI",
-    "selectFile": "Select file (.txt or .pdf)",
-    "fileHint": "Upload a text or PDF file to extract content from",
-    "topicPrompt": "Topic description",
-    "topicPromptPlaceholder": "e.g., Spanish vocabulary for beginners",
-    "provider": "AI Provider",
-    "model": "Model (optional)",
-    "modelHint": "Required for OpenRouter. Examples: gpt-4o-mini, claude-sonnet-4-0",
-    "generate": "Generate",
-    "cardsGenerated": "{{count}} cards created ({{skipped}} skipped)",
-    "deckGenerated": "Deck created with {{count}} cards ({{skipped}} skipped)",
-    "generationFailed": "AI generation failed",
-    "noFileSelected": "Please select a file",
-    "modelRequiredForOpenRouter": "Model is required for OpenRouter",
-    "apiKeys": "AI API Keys",
-    "apiKeysDesc": "Manage your AI provider API keys for card generation",
-    "noApiKeys": "No API keys configured yet",
-    "addApiKey": "Add API Key",
-    "keyAlias": "Key",
-    "keyCreated": "API key added successfully",
-    "keyDeleted": "API key deleted",
-    "deleteApiKey": "Delete API Key",
-    "deleteKeyConfirm": "Are you sure you want to delete this API key?",
-    "keyAlreadyExists": "An API key for this provider already exists",
-    "providerOpenai": "OpenAI",
-    "providerAnthropic": "Anthropic",
-    "providerGoogle": "Google AI",
-    "providerMistral": "Mistral AI",
-    "providerOpenrouter": "OpenRouter",
-    "defaultModelHint": "Using {{provider}} {{model}}"
   }
 }

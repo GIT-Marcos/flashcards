@@ -3,10 +3,8 @@ import {useNavigate, useParams} from 'react-router-dom';
 import {useInfiniteQuery, useMutation, useQuery, useQueryClient} from '@tanstack/react-query';
 import {deleteDeck, getDecks} from '@/api/decks.api';
 import {createCard, deleteCard, getDeckCards, getPendingCards, updateCard} from '@/api/cards.api';
-import {generateCardsFromFile} from '@/api/ai.api';
 import {Button} from '@/components/ui/Button';
 import {Input} from '@/components/ui/Input';
-import {Select} from '@/components/ui/Select';
 import {Modal} from '@/components/ui/Modal';
 import {Badge} from '@/components/ui/Badge';
 import {SkeletonList} from '@/components/ui/Skeleton';
@@ -23,22 +21,6 @@ import {useTranslation} from 'react-i18next';
 import type {CardResponse} from '@/types/card.types';
 import type {DeckResponse} from '@/types/deck.types';
 import type {PaginationParams} from '@/types/api.types';
-
-const AI_PROVIDERS_DETAIL: Array<{ value: string; labelKey: string }> = [
-    {value: 'OPENAI', labelKey: 'ai:providerOpenai'},
-    {value: 'ANTHROPIC', labelKey: 'ai:providerAnthropic'},
-    {value: 'GOOGLE', labelKey: 'ai:providerGoogle'},
-    {value: 'MISTRAL', labelKey: 'ai:providerMistral'},
-    {value: 'OPENROUTER', labelKey: 'ai:providerOpenrouter'},
-];
-
-const MODEL_DEFAULTS: Record<string, string> = {
-    OPENAI: 'gpt-4o-mini',
-    ANTHROPIC: 'claude-sonnet-4-0',
-    GOOGLE: 'gemini-2.0-flash',
-    MISTRAL: 'mistral-small-latest',
-    OPENROUTER: '',
-};
 
 type TabType = 'all' | 'pending';
 
@@ -58,12 +40,6 @@ export function DeckDetailPage() {
     // Card form state
     const [cardForm, setCardForm] = useState<CardFormData>({front: '', back: ''});
     const [cardErrors, setCardErrors] = useState<Partial<Record<keyof CardFormData, string>>>({});
-
-    const [aiModalOpen, setAiModalOpen] = useState(false);
-    const [aiFile, setAiFile] = useState<File | null>(null);
-    const [aiProvider, setAiProvider] = useState('OPENAI');
-    const [aiModel, setAiModel] = useState('');
-    const [aiFormErrors, setAiFormErrors] = useState<Partial<Record<'file' | 'model', string>>>({});
 
     // Deck info
     const deckQuery = useQuery({
@@ -161,23 +137,6 @@ export function DeckDetailPage() {
         },
     });
 
-    const generateAiMutation = useMutation({
-        mutationFn: () => generateCardsFromFile(id, aiFile!, aiProvider, aiModel || undefined),
-        onSuccess: (result) => {
-            toast.success(t('ai:cardsGenerated', {count: result.totalGenerated, skipped: result.totalSkipped}));
-            setAiModalOpen(false);
-            setAiFile(null);
-            setAiProvider('OPENAI');
-            setAiModel('');
-            setAiFormErrors({});
-            queryClient.invalidateQueries({queryKey: ['cards', id]});
-            queryClient.invalidateQueries({queryKey: ['decks']});
-        },
-        onError: () => {
-            toast.error(t('ai:generationFailed'));
-        },
-    });
-
     const resetCardForm = () => {
         setCardForm({front: '', back: ''});
         setCardErrors({});
@@ -266,10 +225,7 @@ export function DeckDetailPage() {
             </div>
 
             {/* Add card button */}
-            <div className="flex justify-end mb-4 gap-2">
-                <Button size="sm" variant="secondary" onClick={() => setAiModalOpen(true)}>
-                    ✨ {t('ai:generateCards')}
-                </Button>
+            <div className="flex justify-end mb-4">
                 <Button size="sm" onClick={openCreateCard}>
                     {t('decks:addCard')}
                 </Button>
@@ -326,105 +282,6 @@ export function DeckDetailPage() {
                     />
                 </>
             )}
-
-            {/* Generate with AI Modal */}
-            <Modal
-                isOpen={aiModalOpen}
-                onClose={() => {
-                    setAiModalOpen(false);
-                    setAiFile(null);
-                    setAiProvider('OPENAI');
-                    setAiModel('');
-                    setAiFormErrors({});
-                }}
-                title={t('ai:generateCards')}
-            >
-                <form
-                    onSubmit={(e) => {
-                        e.preventDefault();
-                        const errors: typeof aiFormErrors = {};
-                        if (!aiFile) errors.file = t('ai:noFileSelected');
-                        if (aiProvider === 'OPENROUTER' && !aiModel.trim()) errors.model = t('ai:modelRequiredForOpenRouter');
-                        if (errors.file || errors.model) {
-                            setAiFormErrors(errors);
-                            return;
-                        }
-                        setAiFormErrors({});
-                        generateAiMutation.mutate();
-                    }}
-                    className="space-y-4"
-                >
-                    <div>
-                        <label htmlFor="ai-cards-file" className="block text-sm font-medium text-slate-700 mb-1">
-                            {t('ai:selectFile')}
-                        </label>
-                        <input
-                            id="ai-cards-file"
-                            type="file"
-                            accept=".txt,.pdf"
-                            onChange={(e) => {
-                                setAiFile(e.target.files?.[0] ?? null);
-                                setAiFormErrors((p) => ({...p, file: undefined}));
-                            }}
-                            disabled={generateAiMutation.isPending}
-                            className="w-full text-sm text-slate-600 file:mr-3 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100 disabled:opacity-50"
-                        />
-                        {aiFormErrors.file && <p className="mt-1 text-xs text-red-600">{aiFormErrors.file}</p>}
-                        <p className="text-xs text-slate-400 mt-1">{t('ai:fileHint')}</p>
-                    </div>
-                    <Select
-                        label={t('ai:provider')}
-                        value={aiProvider}
-                        onChange={(e) => {
-                            setAiProvider(e.target.value);
-                            setAiModel('');
-                            setAiFormErrors({});
-                        }}
-                        options={AI_PROVIDERS_DETAIL.map(p => ({value: p.value, label: t(p.labelKey)}))}
-                        disabled={generateAiMutation.isPending}
-                    />
-                    {aiProvider === 'OPENROUTER' ? (
-                        <Input
-                            label={t('ai:model')}
-                            placeholder="openai/gpt-4o-mini"
-                            value={aiModel}
-                            onChange={(e) => {
-                                setAiModel(e.target.value);
-                                setAiFormErrors((p) => ({...p, model: undefined}));
-                            }}
-                            error={aiFormErrors.model}
-                            disabled={generateAiMutation.isPending}
-                            required
-                        />
-                    ) : (
-                        <p className="text-xs text-slate-500">
-                            {t('ai:defaultModelHint', {
-                                provider: t(`ai:provider${aiProvider.toLowerCase()}`),
-                                model: MODEL_DEFAULTS[aiProvider]
-                            })}
-                        </p>
-                    )}
-                    <div className="flex justify-end gap-3 pt-2">
-                        <Button
-                            type="button"
-                            variant="secondary"
-                            onClick={() => {
-                                setAiModalOpen(false);
-                                setAiFile(null);
-                                setAiProvider('OPENAI');
-                                setAiModel('');
-                                setAiFormErrors({});
-                            }}
-                            disabled={generateAiMutation.isPending}
-                        >
-                            {t('common:cancel')}
-                        </Button>
-                        <Button type="submit" isLoading={generateAiMutation.isPending}>
-                            {t('ai:generate')}
-                        </Button>
-                    </div>
-                </form>
-            </Modal>
 
             {/* Card Modal */}
             <Modal

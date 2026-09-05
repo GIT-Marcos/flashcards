@@ -77,22 +77,8 @@ export const resetPasswordSchema = z
         path: ['confirmPassword'],
     });
 
-export const aiTopicSchema = z.object({
-    prompt: z.string().min(1, 'promptRequired').max(2000, 'promptMax'),
-    provider: z.string().min(1, 'providerRequired'),
-    deckName: z.string().min(1, 'deckNameRequired').max(100, 'deckNameMax'),
-    model: z.string().optional(),
-});
-
-export const createApiKeySchema = z.object({
-    provider: z.string().min(1, 'providerRequired'),
-    apiKey: z.string().min(1, 'apiKeyRequired'),
-});
-
 export type ForgotPasswordFormData = z.infer<typeof forgotPasswordSchema>;
 export type ResetPasswordFormData = z.infer<typeof resetPasswordSchema>;
-export type AiTopicFormData = z.infer<typeof aiTopicSchema>;
-export type CreateApiKeyFormData = z.infer<typeof createApiKeySchema>;
 
 export function translateFieldErrors(
     t: (key: string) => string,
