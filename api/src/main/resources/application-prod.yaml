@@ -1,0 +1,59 @@
+# ---- DATASOURCE ----
+spring:
+  datasource:
+    url: ${DB_URL}
+    username: ${DB_USER}
+    password: ${DB_PASSWORD}
+    hikari:
+      maximum-pool-size: 3
+      leak-detection-threshold: 60000
+
+  # ---- JPA ----
+  jpa:
+    show-sql: false
+
+  # ---- FLYWAY ----
+  flyway:
+    clean-disabled: true
+    placeholders:
+      ADMIN_USERNAME: ${ADMIN_USERNAME}
+      ADMIN_EMAIL: ${ADMIN_EMAIL}
+      ADMIN_PSW_HASH: ${ADMIN_PSW_HASH}
+      ADMIN_ZONE: ${ADMIN_ZONE}
+      TEST_USERNAME: ${TEST_USERNAME}
+      TEST_USER_EMAIL: ${TEST_USER_EMAIL}
+      TEST_USER_PSW_HASH: ${TEST_USER_PSW_HASH}
+      TEST_USER_ZONE: ${TEST_USER_ZONE}
+
+# ---- SECURITY ----
+application:
+  security:
+    secure-cookie: true
+    same-site: None
+
+# ---- LOGGING ----
+logging:
+  level:
+    root: WARN
+    com.usuario.flashcards: WARN
+    org.springframework.web.servlet.mvc.method.annotation.ExceptionHandlerExceptionResolver: ERROR
+  pattern:
+    console: "%d{yyyy-MM-dd'T'HH:mm:ss.SSSZ} %5level [%thread] %logger{36} - %msg%n"
+
+# ---- ACTUATOR / METRICS ----
+management:
+  endpoint:
+    health:
+      probes:
+        enabled: true
+  metrics:
+    auth:
+      username: ${METRICS_USERNAME}
+      password: ${METRICS_PASSWORD}
+
+# SPRINGDOC OPENAPI (deshabilitado en free-tier)
+springdoc:
+  api-docs:
+    enabled: false
+  swagger-ui:
+    enabled: false

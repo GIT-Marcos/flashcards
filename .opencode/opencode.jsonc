@@ -1,0 +1,51 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "agent": {
+    "project-planner": {
+      "mode": "primary",
+      "description": "Planificador general backend y frontend — planificación estructurada orientada para todo el proyecto",
+      "prompt": "{file:./project-planner.md}",
+      "permission": {
+        "task": {
+          "*": "allow"
+        },
+        "edit": "deny",
+        "bash": "ask",
+        "question": "allow"
+      }
+    }
+  },
+  "references": {
+    "api": {
+      "path": "../api",
+      "description": "Módulo API — gestión backend del sistema"
+    },
+    "front": {
+      "path": "../front",
+      "description": "Módulo Frontend — interfaz de usuario React"
+    }
+  },
+  "mcp": {
+    "context7": {
+      "type": "remote",
+      "url": "https://mcp.context7.com/mcp",
+      "headers": {
+        "CONTEXT7_API_KEY": "{env:CONTEXT7_API_KEY}"
+      },
+      "enabled": true
+    },
+    "supabase": {
+      "type": "remote",
+      "url": "{env:SUPABASE_URL_FLASHCARDS}",
+      "enabled": true
+    },
+    "render": {
+      "type": "remote",
+      "url": "https://mcp.render.com/mcp",
+      "headers": {
+        "Authorization": "Bearer {env:RENDER_MCP_TOKEN_FLASHCARDS}"
+      },
+      "enabled": true
+    }
+  }
+}

@@ -1,0 +1,157 @@
+spring:
+  application:
+    name: flashcards-api
+  profiles:
+    active: ${APP_PROFILE}
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+  mvc:
+    problemdetails:
+      enabled: true
+  servlet:
+    multipart:
+      enabled: true
+      max-file-size: 5MB
+      max-request-size: 5MB
+
+  # FLYWAY
+  flyway:
+    enabled: true
+    encoding: UTF-8
+
+  # DATASOURCE
+  datasource:
+    hikari:
+      connection-timeout: 20000
+      max-lifetime: 1800000
+      initialization-fail-timeout: 1
+
+# MAILEROO
+maileroo:
+  api-key: ${MAILEROO_API_KEY}
+  webhook-secret: ${MAILEROO_WEBHOOK_SECRET}
+
+# JWT /// 7 days: 604800000 - 15 min: 900000 - 24h: 86400000
+application:
+  security:
+    jwt:
+      secret-key: ${JWT_SECRET_KEY}
+      expiration: 900000
+      refresh-token:
+        expiration: 604800000
+    verification-token-expiration: 86400000
+    reset-token-expiration: 900000
+
+  # NOTIFICATIONS
+  notifications:
+    # Minimum hour for notifications
+    send-at-hour: ${NOTIFY_MIN_HOUR:9}
+    # Amount of hours for the next notification
+    threshold-hours: ${NOTIFY_THRESHOLD_HOURS:20}
+    cron: ${NOTIFY_CRON:0 0 * * * *}
+    # App URL for email links
+    app-url: ${APP_URL:http://localhost:5173}
+    # From address and name for notification emails
+    from-address: ${NOTIFY_FROM_ADDRESS}
+    from-name: ${NOTIFY_FROM_NAME:Flashcards App}
+    # Unsubscribe token expiration (30 days in ms)
+    unsubscribe-token-expiration: 2592000000
+    # API base URL for unsubscribe link
+    api-url: ${API_URL:http://localhost:8080}
+
+# API KEY ENCRYPTION
+api-key:
+  encryption:
+    secret: ${API_KEY_ENCRYPTION_SECRET}
+
+# CORS
+api:
+  cors:
+    allowed-origins: ${ALLOWED_ORIGINS:http://localhost:5173}
+
+# RATE LIMITING
+rate-limiter:
+  auth:
+    login:
+      capacity: 5
+      refill-tokens: 1
+      refill-period: 10s
+    signup:
+      capacity: 5
+      refill-tokens: 1
+      refill-period: 10s
+    confirm:
+      capacity: 100
+      refill-tokens: 10
+      refill-period: 10s
+    refresh-token:
+      capacity: 10
+      refill-tokens: 2
+      refill-period: 10s
+    logout:
+      capacity: 20
+      refill-tokens: 5
+      refill-period: 10s
+    forgot-password:
+      capacity: 3
+      refill-tokens: 1
+      refill-period: 600s
+    reset-password:
+      capacity: 5
+      refill-tokens: 1
+      refill-period: 60s
+
+# ---- ASYNC (threads for 512 MB RAM) ----
+app:
+  async:
+    update-last-login:
+      core-pool-size: 1
+      max-pool-size: 1
+      queue-capacity: 10
+    mail:
+      core-pool-size: 1
+      max-pool-size: 2
+      queue-capacity: 10
+    system-events:
+      core-pool-size: 1
+      max-pool-size: 2
+      queue-capacity: 20
+    default-pool:
+      core-pool-size: 1
+      max-pool-size: 2
+      queue-capacity: 20
+  metrics:
+    active-users-window-days: 30
+
+# ACTUATOR
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus,metrics
+  endpoint:
+    health:
+      show-details: when-authorized
+  metrics:
+    tags:
+      application: flashcards-api
+    distribution:
+      percentiles-histogram:
+        http.server.requests: true
+      slo:
+        "[ http.server.requests ]": 50ms,100ms,200ms,500ms,1s,2s,5s
+
+# SPRINGDOC OPENAPI
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+    operations-sorter: method
+    tags-sorter: alpha
+  packages-to-scan: com.usuario.flashcards.controller
+  cache:
+    disabled: true
+  show-actuator: false

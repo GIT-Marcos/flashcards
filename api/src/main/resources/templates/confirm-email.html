@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Confirm your email</title>
+    <style>
+        .container {
+            max-width: 500px;
+            margin: 60px auto;
+            padding: 32px 24px;
+            background-color: #ffffff;
+            border-radius: 8px;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+            text-align: center;
+            font-family: Arial, Helvetica, sans-serif;
+        }
+
+        h1 {
+            font-size: 24px;
+            color: #4F46E5;
+            margin: 0 0 16px 0;
+        }
+
+        p {
+            font-size: 16px;
+            color: #6b7280;
+            margin: 0 0 24px 0;
+            line-height: 1.5;
+        }
+
+        .button {
+            display: inline-block;
+            padding: 12px 32px;
+            background-color: #4F46E5;
+            color: #ffffff;
+            border: none;
+            border-radius: 6px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            text-decoration: none;
+        }
+
+        .button:hover {
+            background-color: #4338CA;
+        }
+
+        body {
+            background-color: #f3f4f6;
+            margin: 0;
+            padding: 0;
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <h1>Flashcards App</h1>
+    <p>
+        Click the button below to confirm your email address and activate your account.
+    </p>
+    <form method="POST" th:action="@{/auth/confirm}">
+        <input type="hidden" name="token" th:value="${token}"/>
+        <button type="submit" class="button">Confirm Email</button>
+    </form>
+</div>
+</body>
+</html>

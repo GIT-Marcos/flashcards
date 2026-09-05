@@ -1,0 +1,80 @@
+# CONNECTION
+spring:
+  datasource:
+    url: jdbc:postgresql://localhost:5433/flashcards_db
+    username: postgres
+    password: password
+
+  # ---- JPA ----
+  jpa:
+    show-sql: true
+    properties:
+      hibernate:
+        format_sql: true
+
+  flyway:
+    placeholders:
+      ADMIN_USERNAME: ${ADMIN_USERNAME}
+      ADMIN_EMAIL: ${ADMIN_EMAIL}
+      ADMIN_PSW_HASH: ${ADMIN_PSW_HASH}
+      ADMIN_ZONE: ${ADMIN_ZONE}
+      TEST_USERNAME: ${TEST_USERNAME}
+      TEST_USER_EMAIL: ${TEST_USER_EMAIL}
+      TEST_USER_PSW_HASH: ${TEST_USER_PSW_HASH}
+      TEST_USER_ZONE: ${TEST_USER_ZONE}
+
+# MAILEROO
+maileroo:
+  api-key: ${MAILEROO_API_KEY}
+  webhook-secret: ${MAILEROO_WEBHOOK_SECRET}
+
+# JWT /// 7 days: 604800000 - 15 min: 900000 /// 1 min: 60000 - 2 min: 120000 - 5 min: 300000
+application:
+  notifications:
+    # From address for notification emails
+    from-address: ${NOTIFY_FROM_ADDRESS}
+  security:
+    secure-cookie: true
+    same-site: None
+    jwt:
+      secret-key: ${JWT_SECRET_KEY}
+      expiration: 900000
+      #      expiration: 30000
+      refresh-token:
+        expiration: 604800000
+#        expiration: 60000
+# Logs
+logging:
+  level:
+    root: INFO
+    com:
+      usuario:
+        flashcards: DEBUG
+    mcp:
+      audit: INFO
+    org:
+      springframework:
+        web: DEBUG
+        security: DEBUG
+  pattern:
+    console: "%clr(%d{yyyy-MM-dd'T'HH:mm:ss.SSSZ}){cyan} %clr(%5level){blue} %clr([%thread]){yellow} %clr(%logger{36}){green} - %msg%n"
+
+# ACTUATOR (dev - more verbose)
+management:
+  endpoint:
+    health:
+      show-details: always
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus,metrics,env,threaddump,loggers
+  metrics:
+    auth:
+      username: ${METRICS_USERNAME}
+      password: ${METRICS_PASSWORD}
+
+# SPRINGDOC OPENAPI
+springdoc:
+  show-actuator: true
+  swagger-ui:
+    try-it-out-enabled: true

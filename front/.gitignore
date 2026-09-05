@@ -1,0 +1,62 @@
+# dependencies
+node_modules/
+
+# build outputs
+dist/
+build/
+out/
+
+# coverage reports
+coverage/
+
+# Vite cache (usually lives under node_modules, but keep this safe)
+.vite/
+
+# TypeScript cache
+*.tsbuildinfo
+
+# Environment variables (do not commit secrets)
+.env
+.env.*
+!.env.example
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Optional: runtime/debug files
+pids
+*.pid
+*.seed
+*.pid.lock
+
+# IDE / Editor
+.vscode/
+.idea/
+*.iml
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+*~
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# Tailwind / PostCSS generated artifacts (only if you use them)
+.tailwind-cache/
+
+# Vite plugin caches (keep generic)
+*.timestamp-*
+
+# opencode config with secrets (use opencode.example.jsonc as template)
+.opencode/opencode.jsonc
