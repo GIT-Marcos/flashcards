@@ -20,6 +20,8 @@ import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest;
 import org.springframework.boot.jpa.test.autoconfigure.TestEntityManager;
 import org.springframework.context.annotation.Import;
 
+import static org.assertj.core.api.Assertions.assertThat;
+
 @DataJpaTest
 @Import({TestcontainersConfig.class, AuditConfig.class, JpaTestConfig.class})
 @DisplayName("Card @Version optimistic locking")

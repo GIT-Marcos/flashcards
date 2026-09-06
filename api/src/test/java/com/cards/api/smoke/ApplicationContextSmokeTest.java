@@ -103,7 +103,7 @@ class ApplicationContextSmokeTest {
         @Test
         @DisplayName("FlashcardsApplication should be the main bean")
         void mainApplicationBeanExists() {
-            assertThat(context.containsBean("flashcardsApplication")).isTrue();
+            assertThat(context.containsBean("apiApplication")).isTrue();
         }
     }
 

@@ -13,6 +13,8 @@ import org.junit.jupiter.api.Test;
 
 import java.time.Instant;
 
+import static org.assertj.core.api.Assertions.assertThat;
+
 @DisplayName("UserApiKeyMapper")
 class UserApiKeyMapperTest {
 

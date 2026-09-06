@@ -19,6 +19,8 @@ import org.springframework.context.annotation.Import;
 
 import java.time.Instant;
 
+import static org.assertj.core.api.Assertions.assertThat;
+
 @DataJpaTest
 @Import({TestcontainersConfig.class, AuditConfig.class, JpaTestConfig.class})
 @DisplayName("StudySession @Version optimistic locking")
