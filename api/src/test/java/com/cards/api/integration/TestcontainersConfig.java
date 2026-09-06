@@ -21,7 +21,7 @@ public class TestcontainersConfig {
     @RestartScope
     @ServiceConnection
     PostgreSQLContainer postgresContainer() {
-        return new PostgreSQLContainer("postgres:15-alpine")
+        return new PostgreSQLContainer("postgres:16-alpine")
                 .withDatabaseName("flashcard_test")
                 .withUsername("test")
                 .withPassword("test")

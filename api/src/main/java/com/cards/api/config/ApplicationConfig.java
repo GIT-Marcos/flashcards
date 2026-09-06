@@ -1,6 +1,7 @@
 package com.cards.api.config;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.springframework.boot.context.properties.ConfigurationPropertiesScan;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.authentication.AuthenticationProvider;
@@ -12,6 +13,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import java.time.Clock;
 
 @Configuration
+@ConfigurationPropertiesScan
 public class ApplicationConfig {
 
     @Bean
