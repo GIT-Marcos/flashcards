@@ -9,31 +9,64 @@ services:
     autoDeployTrigger: checksPass
     healthCheckPath: /actuator/health
     envVars:
+      # ── Profile ──
       - key: APP_PROFILE
-        value: free
+        value: prod
+
+      # ── Database (Supabase direct connection) ──
       - key: DB_URL
         sync: false
       - key: DB_USER
         sync: false
       - key: DB_PASSWORD
         sync: false
+
+      # ── Security ──
       - key: JWT_SECRET_KEY
         sync: false
+      - key: ALLOWED_ORIGINS
+        sync: false
+
+      # ── Admin (Flyway V5) ──
       - key: ADMIN_USERNAME
         value: admin
       - key: ADMIN_EMAIL
         sync: false
       - key: ADMIN_PSW_HASH
         sync: false
-      - key: ALLOWED_ORIGINS
+      - key: ADMIN_ZONE
+        value: UTC
+
+      # ── Test User (Flyway V6) ──
+      - key: TEST_USERNAME
+        value: test_user
+      - key: TEST_USER_EMAIL
         sync: false
+      - key: TEST_USER_PSW_HASH
+        sync: false
+      - key: TEST_USER_ZONE
+        value: UTC
+
+      # ── Maileroo ──
       - key: MAILEROO_API_KEY
         sync: false
       - key: MAILEROO_WEBHOOK_SECRET
         sync: false
-      - key: APP_URL
-        sync: false
       - key: NOTIFY_FROM_ADDRESS
         sync: false
-      - key: NOTIFY_FROM_NAME
+
+      # ── App URLs ──
+      - key: APP_URL
+        sync: false
+      - key: API_URL
+        sync: false
+
+      # ── Encryption ──
+      - key: API_KEY_ENCRYPTION_SECRET
+        sync: false
+
+      # ── Metrics ──
+      - key: METRICS_USERNAME
+        sync: false
+      - key: METRICS_PASSWORD
         sync: false
