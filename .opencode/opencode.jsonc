@@ -34,11 +34,6 @@
       },
       "enabled": true
     },
-    "supabase": {
-      "type": "remote",
-      "url": "{env:SUPABASE_URL_FLASHCARDS}",
-      "enabled": true
-    },
     "render": {
       "type": "remote",
       "url": "https://mcp.render.com/mcp",
