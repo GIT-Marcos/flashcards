@@ -3,10 +3,12 @@ services:
   - type: web
     name: flashcards-api
     runtime: docker
+    dockerfilePath: api/Dockerfile
+    dockerContext: api
     region: ohio
     plan: free
     branch: main
-    autoDeployTrigger: checksPass
+    autoDeployTrigger: commit
     healthCheckPath: /actuator/health
     envVars:
       # ── Profile ──
