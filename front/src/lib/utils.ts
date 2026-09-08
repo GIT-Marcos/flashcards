@@ -1,3 +1,6 @@
+import {type ClassValue, clsx} from 'clsx';
+import {twMerge} from 'tailwind-merge';
+
 const LOCALE_MAP: Record<string, string> = {
     en: 'en-US',
     es: 'es-ES',
@@ -57,8 +60,8 @@ export function truncateText(text: string, maxLength: number): string {
     return text.slice(0, maxLength) + '…';
 }
 
-export function cn(...classes: (string | boolean | undefined | null)[]): string {
-    return classes.filter(Boolean).join(' ');
+export function cn(...inputs: ClassValue[]): string {
+    return twMerge(clsx(inputs));
 }
 
 export function sleep(ms: number): Promise<void> {
