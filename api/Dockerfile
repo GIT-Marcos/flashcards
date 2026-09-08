@@ -10,7 +10,7 @@ RUN mvn clean package -DskipTests -q
 FROM eclipse-temurin:21-jre-alpine
 RUN addgroup -S appuser && adduser -S -G appuser appuser
 WORKDIR /app
-COPY --from=build /app/target/flashcards-*.jar app.jar
+COPY --from=build /app/target/flashcards*.jar app.jar
 COPY entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 EXPOSE 8080
