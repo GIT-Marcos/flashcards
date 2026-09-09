@@ -25,17 +25,6 @@ tarjeta nuevamente.
 
 ---
 
-## Características
-
-- **Algoritmo SM-2** → intervalos de repaso que se ajustan según tu desempeño
-- **Generación con IA** → crear mazos y tarjetas desde archivos (.txt, .pdf) o descripciones de temas
-- **5 proveedores de IA** → OpenAI, Anthropic, Google, Mistral, OpenRouter
-- **Sesiones de estudio** → agrupación automática de repasos con métricas de precisión
-- **Notificaciones** → recordatorios por email en tu zona horaria
-- **Paginación por cursor** → listas eficientes sin importar la cantidad de datos
-
----
-
 ## Stack tecnológico
 
 | Capa      | Tecnologías                                                         |
