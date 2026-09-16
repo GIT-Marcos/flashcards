@@ -102,6 +102,9 @@ rate-limiter:
       capacity: 5
       refill-tokens: 1
       refill-period: 60s
+  cache:
+    maximum-size: 100000
+    expire-after-access: 1h
 
 # ---- ASYNC (threads for 512 MB RAM) ----
 app:
