@@ -55,29 +55,29 @@ class UserServiceTest {
 
     private User defaultUser() {
         User user = User.builder()
-            .username("testuser")
-            .email("test@email.com")
-            .passwordHash(CURRENT_HASH)
-            .zoneInfo("UTC")
-            .addRole(User.UserRole.ROLE_USER)
-            .build();
+                .username("testuser")
+                .email("test@email.com")
+                .passwordHash(CURRENT_HASH)
+                .zoneInfo("UTC")
+                .addRole(User.UserRole.ROLE_USER)
+                .build();
         user.setId(USER_ID);
         return user;
     }
 
     private UserResponse toResponse(User u) {
         return new UserResponse(
-            u.getId(),
-            u.getUsername(),
-            u.getEmail(),
-            u.getZoneInfo(),
-            u.getCreatedAt(),
-            u.getLastLogin(),
-            u.getLastNotificationSent(),
-            u.getSessionThreshold(),
-            u.getStartOfDay(),
-            u.isNotificationsEnabled(),
-            u.getRoles().stream().map(Enum::toString).collect(java.util.stream.Collectors.toSet())
+                u.getId(),
+                u.getUsername(),
+                u.getEmail(),
+                u.getZoneInfo(),
+                u.getCreatedAt(),
+                u.getLastLogin(),
+                u.getLastNotificationSent(),
+                u.getSessionThreshold(),
+                u.getStartOfDay(),
+                u.isNotificationsEnabled(),
+                u.getRoles().stream().map(Enum::toString).collect(java.util.stream.Collectors.toSet())
         );
     }
 
@@ -109,7 +109,7 @@ class UserServiceTest {
             when(userRepo.findById(USER_ID)).thenReturn(Optional.empty());
 
             assertThatThrownBy(() -> userService.getCurrent(USER_ID))
-                .isInstanceOf(ResourceNotFoundException.class);
+                    .isInstanceOf(ResourceNotFoundException.class);
         }
     }
 
@@ -125,11 +125,11 @@ class UserServiceTest {
             PatchUserRequest request = new PatchUserRequest("newname", null, null, null, null, null, null);
             User user = defaultUser();
             UserResponse expected = new UserResponse(
-                user.getId(), user.getUsername(), user.getEmail(), user.getZoneInfo(),
-                user.getCreatedAt(), user.getLastLogin(), user.getLastNotificationSent(),
-                user.getSessionThreshold(), user.getStartOfDay(),
-                user.isNotificationsEnabled(),
-                user.getRoles().stream().map(Enum::toString).collect(java.util.stream.Collectors.toSet())
+                    user.getId(), user.getUsername(), user.getEmail(), user.getZoneInfo(),
+                    user.getCreatedAt(), user.getLastLogin(), user.getLastNotificationSent(),
+                    user.getSessionThreshold(), user.getStartOfDay(),
+                    user.isNotificationsEnabled(),
+                    user.getRoles().stream().map(Enum::toString).collect(java.util.stream.Collectors.toSet())
             );
 
             when(userRepo.findById(USER_ID)).thenReturn(Optional.of(user));
@@ -187,8 +187,8 @@ class UserServiceTest {
             when(userRepo.findById(USER_ID)).thenReturn(Optional.of(defaultUser()));
 
             assertThatThrownBy(() -> userService.patch(USER_ID, request))
-                .isInstanceOf(BadCredentialsException.class)
-                .hasMessage("The current password is required");
+                    .isInstanceOf(BadCredentialsException.class)
+                    .hasMessage("The current password is required");
 
             verify(passwordEncoder, never()).encode(anyString());
         }
@@ -202,8 +202,8 @@ class UserServiceTest {
             when(passwordEncoder.matches("wrongPwd", CURRENT_HASH)).thenReturn(false);
 
             assertThatThrownBy(() -> userService.patch(USER_ID, request))
-                .isInstanceOf(BadCredentialsException.class)
-                .hasMessage("The current password does not match");
+                    .isInstanceOf(BadCredentialsException.class)
+                    .hasMessage("The current password does not match");
 
             verify(passwordEncoder, never()).encode(anyString());
         }
@@ -217,7 +217,7 @@ class UserServiceTest {
             when(userRepo.existsByUsernameIgnoreCase("taken")).thenReturn(true);
 
             assertThatThrownBy(() -> userService.patch(USER_ID, request))
-                .isInstanceOf(DuplicatedUsernameException.class);
+                    .isInstanceOf(DuplicatedUsernameException.class);
         }
 
         @Test
@@ -229,7 +229,7 @@ class UserServiceTest {
             when(userRepo.existsByEmailIgnoreCase("taken@email.com")).thenReturn(true);
 
             assertThatThrownBy(() -> userService.patch(USER_ID, request))
-                .isInstanceOf(DuplicatedUserEmailException.class);
+                    .isInstanceOf(DuplicatedUserEmailException.class);
         }
 
         @Test
@@ -247,7 +247,7 @@ class UserServiceTest {
             when(userRepo.save(user)).thenThrow(new DataIntegrityViolationException("unique", constraintEx));
 
             assertThatThrownBy(() -> userService.patch(USER_ID, request))
-                .isInstanceOf(DuplicatedUsernameException.class);
+                    .isInstanceOf(DuplicatedUsernameException.class);
         }
 
         @Test
@@ -265,7 +265,7 @@ class UserServiceTest {
             when(userRepo.save(user)).thenThrow(new DataIntegrityViolationException("unique", constraintEx));
 
             assertThatThrownBy(() -> userService.patch(USER_ID, request))
-                .isInstanceOf(DuplicatedUserEmailException.class);
+                    .isInstanceOf(DuplicatedUserEmailException.class);
         }
 
         @Test
@@ -283,8 +283,8 @@ class UserServiceTest {
             when(userRepo.save(user)).thenThrow(new DataIntegrityViolationException("unique", constraintEx));
 
             assertThatThrownBy(() -> userService.patch(USER_ID, request))
-                .isInstanceOf(BadCredentialsException.class)
-                .hasMessage("Error while saving - Data integrity violation");
+                    .isInstanceOf(BadCredentialsException.class)
+                    .hasMessage("Error while saving - Data integrity violation");
         }
 
         @Test
@@ -370,7 +370,7 @@ class UserServiceTest {
 
             userService.deleteUser(USER_ID);
 
-            verify(userRepo).deleteById(USER_ID);
+            verify(userRepo).bulkDeleteById(USER_ID);
         }
 
         @Test
@@ -379,9 +379,9 @@ class UserServiceTest {
             when(userRepo.existsById(USER_ID)).thenReturn(false);
 
             assertThatThrownBy(() -> userService.deleteUser(USER_ID))
-                .isInstanceOf(ResourceNotFoundException.class);
+                    .isInstanceOf(ResourceNotFoundException.class);
 
-            verify(userRepo, never()).deleteById(any());
+            verify(userRepo, never()).bulkDeleteById(any());
         }
     }
 

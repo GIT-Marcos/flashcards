@@ -22,6 +22,15 @@ public interface UserRepository extends JpaRepository<User, Long>, JpaSpecificat
     @Query("UPDATE User u SET u.lastLogin = :now WHERE u.id = :userId")
     int updateLastLogin(@Param("userId") Long userId, @Param("now") Instant now);
 
+    /**
+     * Borrado físico en una única sentencia. El cascado a decks, cards, study_sessions y
+     * card_review_log lo ejecuta la BD mediante las acciones referenciales de V1
+     * (ON DELETE CASCADE). Ver SDD §6.5 "Borrado de Datos".
+     */
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("DELETE FROM User u WHERE u.id = :id")
+    int bulkDeleteById(@Param("id") Long id);
+
     @Query("""
             SELECT DISTINCT new com.cards.api.dto.DataForNotificationDTO(
                 u.id, u.username, u.email, u.zoneInfo

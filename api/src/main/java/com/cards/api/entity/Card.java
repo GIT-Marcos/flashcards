@@ -14,10 +14,10 @@ import java.util.Objects;
 // Flyway es la fuente de verdad del esquema. El índice real usa LOWER(front) para unicidad
 // case-insensitive; este @Index es referencia para validación (ddl-auto: validate).
 @Table(
-    name = "cards",
-    indexes = {
-        @Index(name = "uk_cards_deck_id_front_lower", columnList = "deck_id, front", unique = true)
-    }
+        name = "cards",
+        indexes = {
+                @Index(name = "uk_cards_deck_id_front_lower", columnList = "deck_id, front", unique = true)
+        }
 )
 public class Card extends BaseEntity {
 
@@ -54,6 +54,12 @@ public class Card extends BaseEntity {
     @JoinColumn(name = "deck_id", nullable = false)
     private Deck deck;
 
+    /**
+     * Sin cascade ni orphanRemoval a propósito: al borrar una Card, la BD nullifica
+     * card_review_log.card_id (ON DELETE SET NULL) pero preserva el historial de estudio.
+     * Añadir cascade = REMOVE u orphanRemoval aquí destruiría ese historial e incumpliría
+     * el SDD §6.5 "Borrado de Datos".
+     */
     @OneToMany(mappedBy = "card")
     private List<CardReviewLog> reviewLogs = new ArrayList<>();
 
@@ -174,12 +180,12 @@ public class Card extends BaseEntity {
         ZoneId zoneId = TimeZoneUtils.parseOrFallback(user.getZoneInfo(), ZoneId.of("UTC"));
         ZonedDateTime nowUser = ZonedDateTime.ofInstant(reviewMoment, zoneId);
         return nowUser
-            .plusDays(intervalDays)
-            .withHour(user.getStartOfDay())
-            .withMinute(0)
-            .withSecond(0)
-            .withNano(0)
-            .toInstant();
+                .plusDays(intervalDays)
+                .withHour(user.getStartOfDay())
+                .withMinute(0)
+                .withSecond(0)
+                .withNano(0)
+                .toInstant();
     }
 
     public void setDeck(Deck deck) {
@@ -270,7 +276,7 @@ public class Card extends BaseEntity {
         if (o == null || getClass() != o.getClass()) return false;
         Card card = (Card) o;
         return Objects.equals(front, card.front) &&
-            Objects.equals(getDeckIdentifier(), card.getDeckIdentifier());
+                Objects.equals(getDeckIdentifier(), card.getDeckIdentifier());
     }
 
     @Override
@@ -285,13 +291,13 @@ public class Card extends BaseEntity {
     @Override
     public String toString() {
         return "Card{" +
-            "id=" + id +
-            ", front='" + front + '\'' +
-            ", back='" + back + '\'' +
-            ", nextReviewDate=" + nextReviewDate +
-            ", intervalDays=" + this.intervalDays +
-            ", repetitionCount=" + repetitionCount +
-            ", easinessFactor=" + easinessFactor +
-            '}';
+                "id=" + id +
+                ", front='" + front + '\'' +
+                ", back='" + back + '\'' +
+                ", nextReviewDate=" + nextReviewDate +
+                ", intervalDays=" + this.intervalDays +
+                ", repetitionCount=" + repetitionCount +
+                ", easinessFactor=" + easinessFactor +
+                '}';
     }
 }

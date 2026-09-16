@@ -103,7 +103,7 @@ public class AdminService {
         if (!userRepo.existsById(userId))
             throw new ResourceNotFoundException("The user with the id '" + userId + "' does not exist");
 
-        userRepo.deleteById(userId);
+        userRepo.bulkDeleteById(userId);
     }
 
     @Transactional
@@ -111,7 +111,7 @@ public class AdminService {
         if (!deckRepo.existsById(deckId))
             throw new ResourceNotFoundException("The deck with the id '" + deckId + "' does not exist");
 
-        deckRepo.deleteById(deckId);
+        deckRepo.bulkDeleteById(deckId);
     }
 
     @Transactional

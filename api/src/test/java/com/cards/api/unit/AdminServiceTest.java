@@ -364,7 +364,7 @@ class AdminServiceTest {
 
             adminService.deleteUser(USER_ID);
 
-            verify(userRepo).deleteById(USER_ID);
+            verify(userRepo).bulkDeleteById(USER_ID);
         }
 
         @Test
@@ -391,7 +391,7 @@ class AdminServiceTest {
 
             adminService.deleteDeck(DECK_ID);
 
-            verify(deckRepo).deleteById(DECK_ID);
+            verify(deckRepo).bulkDeleteById(DECK_ID);
         }
 
         @Test

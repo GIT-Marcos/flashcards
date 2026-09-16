@@ -462,11 +462,19 @@ Los cálculos se realizan a partir del algoritmo **SuperMemo-2**:
 #### Borrado de Datos
 
 - Se realizan borrados físicos en cascada según la dependencia de las entidades.
+- **Borrado de `User`**: destruye todo lo que el usuario posee — `decks`, `cards`, `study_sessions` y
+  `card_review_log` (vía `ON DELETE CASCADE` sobre `user_id` y `session_id`). Es la única operación que elimina
+  historial de estudio.
+- **Borrado de `Deck` o `Card`**: elimina mazos y tarjetas, pero **preserva** `card_review_log` y `study_sessions`.
 - Preservación de historial de reviews: cuando se elimina una Card, sus registros en `card_review_log` se preservan para
   mantener las estadísticas del usuario.
 - La columna `card_id` es nullable y la FK usa `ON DELETE SET NULL`, de modo que la BD nullifica automáticamente la
   referencia al borrar la card. Esto permite que `GET /sessions/stats` devuelva métricas precisas incluso para cards
   eliminadas.
+- **Mecanismo**: los borrados de `User` y `Deck` se ejecutan con una única sentencia bulk
+  (`UserRepository.bulkDeleteById`, `DeckRepository.bulkDeleteById`) y delegan el cascado en las acciones referenciales
+  definidas en Flyway (V1), que es la fuente de verdad del esquema. **No** debe reintroducirse `cascade`/`orphanRemoval`
+  en JPA para este fin: cargaría el grafo completo en memoria para emitir un DELETE por fila.
 
 #### Control de Concurrencia (Optimistic Locking)
 

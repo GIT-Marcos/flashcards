@@ -110,6 +110,6 @@ public class UserService {
         if (!userRepo.existsById(authUserId))
             throw new ResourceNotFoundException("User not found");
 
-        userRepo.deleteById(authUserId);
+        userRepo.bulkDeleteById(authUserId);
     }
 }
