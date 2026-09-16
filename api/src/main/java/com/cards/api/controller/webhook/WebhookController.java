@@ -9,6 +9,7 @@ import org.springframework.web.bind.annotation.*;
 
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
+import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.util.HexFormat;
 
@@ -29,8 +30,8 @@ public class WebhookController {
 
     @PostMapping
     public ResponseEntity<Void> handleWebhook(
-        @RequestBody String payload,
-        @RequestHeader("x-maileroo-signature") String signature) {
+            @RequestBody String payload,
+            @RequestHeader("x-maileroo-signature") String signature) {
 
         if (!isValidSignature(payload, signature)) {
             log.warn("Invalid Maileroo webhook signature");
@@ -44,9 +45,9 @@ public class WebhookController {
     private boolean isValidSignature(String payload, String signature) {
         try {
             Mac mac = Mac.getInstance("HmacSHA256");
-            mac.init(new SecretKeySpec(sharedSecret.getBytes(), "HmacSHA256"));
-            String expected = HexFormat.of().formatHex(mac.doFinal(payload.getBytes()));
-            return MessageDigest.isEqual(expected.getBytes(), signature.getBytes());
+            mac.init(new SecretKeySpec(sharedSecret.getBytes(StandardCharsets.UTF_8), "HmacSHA256"));
+            String expected = HexFormat.of().formatHex(mac.doFinal(payload.getBytes(StandardCharsets.UTF_8)));
+            return MessageDigest.isEqual(expected.getBytes(StandardCharsets.UTF_8), signature.getBytes(StandardCharsets.UTF_8));
         } catch (Exception e) {
             log.error("Failed to verify webhook signature", e);
             return false;
