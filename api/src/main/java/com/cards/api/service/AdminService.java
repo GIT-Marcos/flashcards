@@ -17,6 +17,8 @@ import com.cards.api.repo.UserRepository;
 import com.cards.api.service.notification.EmailService;
 import com.cards.api.specification.CardSpecifications;
 import com.cards.api.specification.DeckSpecification;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.data.domain.Window;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
@@ -27,6 +29,8 @@ import java.time.Instant;
 
 @Service
 public class AdminService {
+
+    private static final Logger log = LoggerFactory.getLogger(AdminService.class);
 
     private final DeckRepository deckRepo;
     private final UserRepository userRepo;
@@ -51,41 +55,47 @@ public class AdminService {
 
     public Window<UserResponse> getAllUsers(CursorPaginationRequest req) {
         CursorPaginationRequest pagination = CursorPaginationRequest.forUsers(
-            req.lastId(), req.cursorValue(), req.pageSize(), req.direction());
+                req.lastId(), req.cursorValue(), req.pageSize(), req.direction());
         Specification<User> spec = (root, query, cb) -> cb.conjunction();
         return userRepo.findBy(spec, query -> query
-            .limit(pagination.pageSize())
-            .sortBy(pagination.toSort())
-            .scroll(pagination.toScrollPosition())
+                .limit(pagination.pageSize())
+                .sortBy(pagination.toSort())
+                .scroll(pagination.toScrollPosition())
         ).map(userMapper::toResponse);
     }
 
     public Window<DeckResponse> getUserDecks(Long userId, CursorPaginationRequest req) {
+        if (!userRepo.existsById(userId))
+            throw new ResourceNotFoundException("The user with the id '" + userId + "' does not exist");
+
         CursorPaginationRequest pagination = CursorPaginationRequest.forDecks(
-            req.lastId(), req.cursorValue(), req.pageSize(), req.direction());
+                req.lastId(), req.cursorValue(), req.pageSize(), req.direction());
         var spec = DeckSpecification.getFromUser(userId);
         return deckRepo.findBy(spec, query -> query
-            .limit(pagination.pageSize())
-            .sortBy(pagination.toSort())
-            .scroll(pagination.toScrollPosition())
+                .limit(pagination.pageSize())
+                .sortBy(pagination.toSort())
+                .scroll(pagination.toScrollPosition())
         ).map(deckMapper::toResponse);
     }
 
     public Window<CardResponse> getDeckCards(Long deckId, CursorPaginationRequest req) {
-        CursorPaginationRequest pagination = CursorPaginationRequest.forDecks(
-            req.lastId(), req.cursorValue(), req.pageSize(), req.direction());
+        if (!deckRepo.existsById(deckId))
+            throw new ResourceNotFoundException("The deck with the id '" + deckId + "' does not exist");
+
+        CursorPaginationRequest pagination = CursorPaginationRequest.forCards(
+                req.lastId(), req.cursorValue(), req.pageSize(), req.direction());
         var spec = CardSpecifications.hasDeck(deckId);
         return cardRepo.findBy(spec, query -> query
-            .limit(pagination.pageSize())
-            .sortBy(pagination.toSort())
-            .scroll(pagination.toScrollPosition())
+                .limit(pagination.pageSize())
+                .sortBy(pagination.toSort())
+                .scroll(pagination.toScrollPosition())
         ).map(cardMapper::toResponse);
     }
 
     public CardResponse getCard(Long cardId) {
         return cardRepo.findById(cardId)
-            .map(cardMapper::toResponse)
-            .orElseThrow(() -> new ResourceNotFoundException("The card with the id '" + cardId + "' does not exist"));
+                .map(cardMapper::toResponse)
+                .orElseThrow(() -> new ResourceNotFoundException("The card with the id '" + cardId + "' does not exist"));
     }
 
     @Transactional
@@ -107,7 +117,7 @@ public class AdminService {
     @Transactional
     public void deleteCard(Long cardId) {
         Card card = cardRepo.findById(cardId)
-            .orElseThrow(() -> new ResourceNotFoundException("The card with the id '" + cardId + "' does not exist"));
+                .orElseThrow(() -> new ResourceNotFoundException("The card with the id '" + cardId + "' does not exist"));
 
         Deck deck = card.getDeck();
         cardRepo.delete(card);
@@ -123,17 +133,26 @@ public class AdminService {
      * Unlike the scheduler's batch flow (which is asynchronous), this method
      * blocks until the email is sent or all retries are exhausted. The caller
      * receives synchronous feedback about the outcome.
+     * <p>
+     * If the user has unsubscribed ({@code notificationsEnabled == false}) the reminder is
+     * skipped: nothing is sent and {@code lastNotificationSent} is left untouched, so the
+     * scheduler's threshold and the Maileroo webhook rollback stay consistent.
      *
      * @param userId the ID of the user to notify
      * @throws ResourceNotFoundException if no user exists with the given ID
      * @throws RuntimeException          if the email could not be sent after all retries
      */
     public void sendNotification(Long userId) {
-        Instant now = Instant.now(clock);
         User user = userRepo.findById(userId).orElseThrow(
-            () -> new ResourceNotFoundException("User not found")
+                () -> new ResourceNotFoundException("User not found")
         );
 
+        if (!user.isNotificationsEnabled()) {
+            log.info("Skipping review reminder for user {}: notifications are disabled", userId);
+            return;
+        }
+
+        Instant now = Instant.now(clock);
         emailService.sendReviewReminderSync(user.getEmail(), user.getUsername(), user.getId(), now);
     }
 }
