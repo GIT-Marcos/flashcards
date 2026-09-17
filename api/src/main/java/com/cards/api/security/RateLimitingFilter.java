@@ -43,7 +43,7 @@ public class RateLimitingFilter extends OncePerRequestFilter {
             @NonNull FilterChain filterChain
     ) throws ServletException, IOException {
 
-        String clientIp = getClientIp(request);
+        String clientIp = request.getRemoteAddr();
         String path = request.getServletPath();
         String bucketKey = clientIp + ":" + path;
 
@@ -75,13 +75,5 @@ public class RateLimitingFilter extends OncePerRequestFilter {
 
     Cache<String, Bucket> bucketCache() {
         return buckets;
-    }
-
-    private String getClientIp(HttpServletRequest request) {
-        String xForwardedFor = request.getHeader("X-Forwarded-For");
-        if (xForwardedFor != null && !xForwardedFor.isEmpty()) {
-            return xForwardedFor.split(",")[0].strip();
-        }
-        return request.getRemoteAddr();
     }
 }

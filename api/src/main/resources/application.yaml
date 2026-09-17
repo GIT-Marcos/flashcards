@@ -28,6 +28,10 @@ spring:
       max-lifetime: 1800000
       initialization-fail-timeout: 1
 
+# SERVER
+server:
+  forward-headers-strategy: native
+
 # MAILEROO
 maileroo:
   api-key: ${MAILEROO_API_KEY}
