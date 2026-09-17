@@ -4,6 +4,7 @@ import com.cards.api.dto.request.PatchUserRequest;
 import com.cards.api.dto.response.UserResponse;
 import com.cards.api.entity.User;
 import com.cards.api.exception.ResourceNotFoundException;
+import com.cards.api.exception.domain.DataIntegrityException;
 import com.cards.api.exception.domain.DuplicatedUserEmailException;
 import com.cards.api.exception.domain.DuplicatedUsernameException;
 import com.cards.api.mapper.UserMapper;
@@ -269,8 +270,8 @@ class UserServiceTest {
         }
 
         @Test
-        @DisplayName("should throw BadCredentialsException on unknown constraint violation")
-        void shouldCatchDataIntegrityAndThrowBadCredentialsFallback() {
+        @DisplayName("should throw DataIntegrityException on unknown constraint violation")
+        void shouldCatchDataIntegrityAndThrowDataIntegrityFallback() {
             PatchUserRequest request = new PatchUserRequest("new", null, null, null, null, null, null);
             User user = defaultUser();
 
@@ -283,7 +284,7 @@ class UserServiceTest {
             when(userRepo.save(user)).thenThrow(new DataIntegrityViolationException("unique", constraintEx));
 
             assertThatThrownBy(() -> userService.patch(USER_ID, request))
-                    .isInstanceOf(BadCredentialsException.class)
+                    .isInstanceOf(DataIntegrityException.class)
                     .hasMessage("Error while saving - Data integrity violation");
         }
 

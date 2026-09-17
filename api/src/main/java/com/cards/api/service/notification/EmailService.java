@@ -1,10 +1,10 @@
 package com.cards.api.service.notification;
 
-import com.maileroo.EmailAddress;
-import com.maileroo.MailerooClient;
 import com.cards.api.config.properties.ApplicationProperties;
 import com.cards.api.service.JwtService;
 import com.cards.api.service.UserService;
+import com.maileroo.EmailAddress;
+import com.maileroo.MailerooClient;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Timer;
@@ -129,7 +129,7 @@ public class EmailService {
         } catch (Exception ex) {
             failedEmailsCounter.increment();
             log.error("Failed to send verification email to {} ({}) after retries: {}",
-                username, toEmail, ex.getMessage());
+                    username, toEmail, ex.getMessage());
             throw new RuntimeException("Failed to send verification email", ex);
         } finally {
             sample.stop(emailDeliveryTimer);
@@ -161,7 +161,7 @@ public class EmailService {
         } catch (Exception ex) {
             failedEmailsCounter.increment();
             log.warn("Failed to send reminder email to user {} ({}) after retries: {}",
-                userId, toEmail, ex.getMessage());
+                    userId, toEmail, ex.getMessage());
             return CompletableFuture.failedFuture(ex);
         } finally {
             sample.stop(emailDeliveryTimer);
@@ -203,7 +203,7 @@ public class EmailService {
         } catch (Exception ex) {
             failedEmailsCounter.increment();
             log.error("Failed to send password reset email to {} ({}) after retries: {}",
-                username, toEmail, ex.getMessage());
+                    username, toEmail, ex.getMessage());
             throw new RuntimeException("Failed to send password reset email", ex);
         } finally {
             sample.stop(emailDeliveryTimer);
@@ -231,7 +231,7 @@ public class EmailService {
         } catch (Exception ex) {
             failedEmailsCounter.increment();
             log.warn("Failed to send reminder email to user {} ({}) after retries: {}",
-                userId, toEmail, ex.getMessage());
+                    userId, toEmail, ex.getMessage());
             throw new RuntimeException(ex);
         } finally {
             sample.stop(emailDeliveryTimer);
