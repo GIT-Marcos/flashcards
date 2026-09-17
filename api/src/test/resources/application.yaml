@@ -20,6 +20,7 @@ application:
   security:
     jwt:
       secret-key: test-jwt-secret-key-for-unit-tests-only-not-for-production
+    pwd-fingerprint-secret: MDEyMzQ1Njc4OTAxMjM0NTY3ODkwMTIzNDU2Nzg5MDE=
   notifications:
     from-address: test@flashcards.com
 

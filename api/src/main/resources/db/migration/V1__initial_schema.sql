@@ -102,3 +102,18 @@ CREATE TABLE card_review_log
 CREATE INDEX idx_card_review_log_card_id ON card_review_log (card_id);
 CREATE INDEX idx_card_review_log_user_id ON card_review_log (user_id);
 CREATE INDEX idx_card_review_log_session_id ON card_review_log (session_id);
+
+-- 7. Tabla de Registros Pendientes (verificación de email pre-cuenta)
+CREATE TABLE pending_registrations
+(
+    id            BIGSERIAL PRIMARY KEY,
+    username      VARCHAR(50)  NOT NULL,
+    email         VARCHAR(100) NOT NULL,
+    password_hash VARCHAR(255) NOT NULL,
+    zone_info     VARCHAR(50)  NOT NULL,
+    token_hash    VARCHAR(64)  NOT NULL,
+    expires_at    TIMESTAMPTZ  NOT NULL,
+    created_at    TIMESTAMPTZ  NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at    TIMESTAMPTZ  NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT uk_pending_token_hash UNIQUE (token_hash)
+);

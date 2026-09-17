@@ -47,6 +47,7 @@ application:
         expiration: 604800000
     verification-token-expiration: 86400000
     reset-token-expiration: 900000
+    pwd-fingerprint-secret: ${PWD_FINGERPRINT_SECRET}
 
   # NOTIFICATIONS
   notifications:

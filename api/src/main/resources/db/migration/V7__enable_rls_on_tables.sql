@@ -26,3 +26,6 @@ CREATE POLICY "app_full_access" ON study_sessions FOR ALL USING (true) WITH CHEC
 
 ALTER TABLE card_review_log ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "app_full_access" ON card_review_log FOR ALL USING (true) WITH CHECK (true);
+
+ALTER TABLE pending_registrations ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "app_full_access" ON pending_registrations FOR ALL USING (true) WITH CHECK (true);

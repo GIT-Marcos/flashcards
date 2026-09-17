@@ -38,6 +38,8 @@ public class ApplicationProperties {
         private long verificationTokenExpiration = 86400000;
         @Min(1)
         private long resetTokenExpiration = 900000;
+        @NotBlank
+        private String pwdFingerprintSecret;
 
         public Jwt getJwt() {
             return jwt;
@@ -73,6 +75,14 @@ public class ApplicationProperties {
 
         public void setResetTokenExpiration(long resetTokenExpiration) {
             this.resetTokenExpiration = resetTokenExpiration;
+        }
+
+        public String getPwdFingerprintSecret() {
+            return pwdFingerprintSecret;
+        }
+
+        public void setPwdFingerprintSecret(String pwdFingerprintSecret) {
+            this.pwdFingerprintSecret = pwdFingerprintSecret;
         }
     }
 

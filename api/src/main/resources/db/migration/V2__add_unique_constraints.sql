@@ -7,3 +7,7 @@ CREATE UNIQUE INDEX uk_decks_user_id_name_lower ON decks (user_id, LOWER(name));
 
 -- ========== CARD ==========
 CREATE UNIQUE INDEX uk_cards_deck_id_front_lower ON cards (deck_id, LOWER(front));
+
+-- ========== PENDING REGISTRATION ==========
+CREATE UNIQUE INDEX uk_pending_username_lower ON pending_registrations (LOWER (username));
+CREATE UNIQUE INDEX uk_pending_email_lower ON pending_registrations (LOWER (email));

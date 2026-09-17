@@ -17,6 +17,8 @@ import com.cards.api.mapper.SecurityUserMapper;
 import com.cards.api.repo.UserRepository;
 import com.cards.api.service.AuthService;
 import com.cards.api.service.JwtService;
+import com.cards.api.service.PasswordFingerprintService;
+import com.cards.api.service.PendingRegistrationService;
 import com.cards.api.service.notification.EmailService;
 import com.cards.api.util.TokenType;
 import org.junit.jupiter.api.BeforeEach;
@@ -29,6 +31,7 @@ import org.mockito.Captor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -66,6 +69,10 @@ class AuthServiceTest {
     private EmailService emailService;
     @Mock
     private ApplicationProperties properties;
+    @Mock
+    private PendingRegistrationService pendingRegistrationService;
+    @Mock
+    private PasswordFingerprintService passwordFingerprintService;
 
     @Captor
     ArgumentCaptor<UserLoginEvent> eventCaptor;
@@ -80,7 +87,7 @@ class AuthServiceTest {
     private static final String NEW_ENCODED = "$2a$12$newEncodedPassword";
 
     private static final SecurityUser MOCK_SECURITY_USER = new SecurityUser(1L, "testuser", "test@email.com", ENCODED_PASSWORD, "America/Buenos_Aires",
-        List.of(new SimpleGrantedAuthority("ROLE_USER")));
+            List.of(new SimpleGrantedAuthority("ROLE_USER")));
 
     @BeforeEach
     void setUp() {
@@ -90,7 +97,8 @@ class AuthServiceTest {
         lenient().when(properties.getNotifications()).thenReturn(notifications);
 
         authService = new AuthService(eventPublisher, userRepository, passwordEncoder,
-            jwtService, authenticationManager, securityUserMapper, emailService, properties);
+                jwtService, authenticationManager, securityUserMapper, emailService, properties,
+                pendingRegistrationService, passwordFingerprintService);
     }
 
     // ======================== HELPERS ========================
@@ -105,12 +113,12 @@ class AuthServiceTest {
 
     private User persistedUser() {
         User user = User.builder()
-            .username("testuser")
-            .email("new@email.com")
-            .passwordHash(ENCODED_PASSWORD)
-            .zoneInfo("America/Buenos_Aires")
-            .addRole(User.UserRole.ROLE_USER)
-            .build();
+                .username("testuser")
+                .email("new@email.com")
+                .passwordHash(ENCODED_PASSWORD)
+                .zoneInfo("America/Buenos_Aires")
+                .addRole(User.UserRole.ROLE_USER)
+                .build();
         user.setId(1L);
         return user;
     }
@@ -136,14 +144,14 @@ class AuthServiceTest {
             when(userRepository.existsByUsernameIgnoreCase("newuser")).thenReturn(false);
             when(userRepository.existsByEmailIgnoreCase("new@email.com")).thenReturn(false);
             when(passwordEncoder.encode("Str0ngP@ss!")).thenReturn(ENCODED_PASSWORD);
-            when(jwtService.generateEmailVerificationToken("newuser", "new@email.com", ENCODED_PASSWORD, "America/Buenos_Aires"))
-                .thenReturn("verification-jwt-token");
+            when(pendingRegistrationService.createPending("newuser", "new@email.com", ENCODED_PASSWORD, "America/Buenos_Aires"))
+                    .thenReturn("opaque-token-abc123");
 
             SignupResponse response = authService.signup(request);
 
             assertThat(response.message()).contains("new@email.com");
             verify(emailService).sendVerificationEmail("new@email.com", "newuser",
-                "http://localhost:8080/auth/confirm?token=verification-jwt-token");
+                    "http://localhost:8080/auth/confirm?token=opaque-token-abc123");
             verify(userRepository, never()).save(any());
         }
 
@@ -153,7 +161,7 @@ class AuthServiceTest {
             RegisterRequest request = new RegisterRequest("user", "a@b.com", "Str0ngP@ss!", "Invalid/Zone");
 
             assertThatThrownBy(() -> authService.signup(request))
-                .isInstanceOf(InvalidTimeZoneException.class);
+                    .isInstanceOf(InvalidTimeZoneException.class);
             verifyNoInteractions(userRepository);
         }
 
@@ -164,7 +172,7 @@ class AuthServiceTest {
             when(userRepository.existsByUsernameIgnoreCase("newuser")).thenReturn(true);
 
             assertThatThrownBy(() -> authService.signup(request))
-                .isInstanceOf(DuplicatedUsernameException.class);
+                    .isInstanceOf(DuplicatedUsernameException.class);
             verify(emailService, never()).sendVerificationEmail(any(), any(), any());
         }
 
@@ -176,7 +184,22 @@ class AuthServiceTest {
             when(userRepository.existsByEmailIgnoreCase("new@email.com")).thenReturn(true);
 
             assertThatThrownBy(() -> authService.signup(request))
-                .isInstanceOf(DuplicatedUserEmailException.class);
+                    .isInstanceOf(DuplicatedUserEmailException.class);
+            verify(emailService, never()).sendVerificationEmail(any(), any(), any());
+        }
+
+        @Test
+        @DisplayName("should return generic response and skip email when concurrent signup wins the race")
+        void shouldReturnGenericResponseWhenConcurrentSignupWinsRace() {
+            when(userRepository.existsByUsernameIgnoreCase("newuser")).thenReturn(false);
+            when(userRepository.existsByEmailIgnoreCase("new@email.com")).thenReturn(false);
+            when(passwordEncoder.encode("Str0ngP@ss!")).thenReturn(ENCODED_PASSWORD);
+            when(pendingRegistrationService.createPending("newuser", "new@email.com", ENCODED_PASSWORD, "America/Buenos_Aires"))
+                    .thenThrow(new DataIntegrityViolationException("uk_pending_email_lower"));
+
+            SignupResponse response = authService.signup(validRegisterRequest());
+
+            assertThat(response.message()).contains("new@email.com");
             verify(emailService, never()).sendVerificationEmail(any(), any(), any());
         }
     }
@@ -195,14 +218,14 @@ class AuthServiceTest {
             User user = persistedUser();
 
             when(userRepository.findByUsernameIgnoreCase("testuser"))
-                .thenReturn(Optional.of(user));
+                    .thenReturn(Optional.of(user));
 
             when(securityUserMapper.toSecurityUser(any(User.class))).thenReturn(MOCK_SECURITY_USER);
             when(jwtService.generateToken(any(SecurityUser.class)))
-                .thenReturn(VALID_TOKEN);
+                    .thenReturn(VALID_TOKEN);
 
             when(jwtService.generateRefreshToken(any(SecurityUser.class)))
-                .thenReturn(VALID_REFRESH);
+                    .thenReturn(VALID_REFRESH);
 
             AuthResponse response = authService.login(request, null);
 
@@ -211,12 +234,12 @@ class AuthServiceTest {
             assertThat(response.username()).isEqualTo("testuser");
 
             ArgumentCaptor<Authentication> authCaptor =
-                ArgumentCaptor.forClass(Authentication.class);
+                    ArgumentCaptor.forClass(Authentication.class);
 
             verify(authenticationManager).authenticate(authCaptor.capture());
 
             UsernamePasswordAuthenticationToken authToken =
-                (UsernamePasswordAuthenticationToken) authCaptor.getValue();
+                    (UsernamePasswordAuthenticationToken) authCaptor.getValue();
 
             assertThat(authToken.getPrincipal()).isEqualTo("testuser");
             assertThat(authToken.getCredentials()).isEqualTo("Str0ngP@ss!");
@@ -231,10 +254,10 @@ class AuthServiceTest {
         void shouldPropagateBadCredentials() {
             LoginRequest request = validLoginRequest();
             when(authenticationManager.authenticate(any()))
-                .thenThrow(new BadCredentialsException("Bad credentials"));
+                    .thenThrow(new BadCredentialsException("Bad credentials"));
 
             assertThatThrownBy(() -> authService.login(request, null))
-                .isInstanceOf(BadCredentialsException.class);
+                    .isInstanceOf(BadCredentialsException.class);
             verifyNoInteractions(eventPublisher);
         }
 
@@ -245,7 +268,7 @@ class AuthServiceTest {
             when(userRepository.findByUsernameIgnoreCase("testuser")).thenReturn(Optional.empty());
 
             assertThatThrownBy(() -> authService.login(request, null))
-                .isInstanceOf(UsernameNotFoundException.class);
+                    .isInstanceOf(UsernameNotFoundException.class);
         }
     }
 
@@ -260,9 +283,9 @@ class AuthServiceTest {
         void shouldRefreshTokens() {
             User user = persistedUser();
             io.jsonwebtoken.Claims mockClaims = io.jsonwebtoken.Jwts.claims()
-                .add("tokenType", TokenType.REFRESH)
-                .subject("testuser")
-                .build();
+                    .add("tokenType", TokenType.REFRESH)
+                    .subject("testuser")
+                    .build();
 
             when(securityUserMapper.toSecurityUser(any(User.class))).thenReturn(MOCK_SECURITY_USER);
             when(jwtService.isRefreshToken(anyString())).thenReturn(true);
@@ -284,7 +307,7 @@ class AuthServiceTest {
             when(jwtService.isRefreshToken(anyString())).thenReturn(false);
 
             assertThatThrownBy(() -> authService.refreshToken("access-token-as-refresh"))
-                .isInstanceOf(InvalidRefreshTokenException.class);
+                    .isInstanceOf(InvalidRefreshTokenException.class);
         }
 
         @Test
@@ -295,7 +318,7 @@ class AuthServiceTest {
             when(userRepository.findByUsernameIgnoreCase("ghost")).thenReturn(Optional.empty());
 
             assertThatThrownBy(() -> authService.refreshToken("refresh-for-ghost"))
-                .isInstanceOf(InvalidRefreshTokenException.class);
+                    .isInstanceOf(InvalidRefreshTokenException.class);
         }
 
         @Test
@@ -310,8 +333,8 @@ class AuthServiceTest {
             when(jwtService.isTokenValid(anyString(), any(SecurityUser.class))).thenReturn(false);
 
             assertThatThrownBy(() -> authService.refreshToken("invalid-refresh"))
-                .isInstanceOf(RuntimeException.class)
-                .hasMessage("Invalid refresh token");
+                    .isInstanceOf(RuntimeException.class)
+                    .hasMessage("Invalid refresh token");
         }
     }
 
@@ -327,14 +350,15 @@ class AuthServiceTest {
             ForgotPasswordRequest request = forgotPasswordRequest();
             User user = persistedUser();
             when(userRepository.findByEmailIgnoreCase("new@email.com")).thenReturn(Optional.of(user));
-            when(jwtService.generatePasswordResetToken(1L, "new@email.com", ENCODED_PASSWORD))
-                .thenReturn(RESET_TOKEN);
+            when(passwordFingerprintService.compute(ENCODED_PASSWORD)).thenReturn("fingerprint-abc");
+            when(jwtService.generatePasswordResetToken(1L, "fingerprint-abc"))
+                    .thenReturn(RESET_TOKEN);
 
             ForgotPasswordResponse response = authService.forgotPassword(request);
 
             assertThat(response.message()).contains("password reset link has been sent");
             verify(emailService).sendPasswordResetEmail("new@email.com", "testuser",
-                "http://localhost:5173/auth/reset-password?token=" + RESET_TOKEN);
+                    "http://localhost:5173/auth/reset-password?token=" + RESET_TOKEN);
         }
 
         @Test
@@ -347,7 +371,7 @@ class AuthServiceTest {
 
             assertThat(response.message()).contains("password reset link has been sent");
             verify(emailService, never()).sendPasswordResetEmail(any(), any(), any());
-            verify(jwtService, never()).generatePasswordResetToken(any(), any(), any());
+            verify(jwtService, never()).generatePasswordResetToken(any(), any());
         }
 
         @Test
@@ -356,13 +380,14 @@ class AuthServiceTest {
             ForgotPasswordRequest request = forgotPasswordRequest();
             User user = persistedUser();
             when(userRepository.findByEmailIgnoreCase("new@email.com")).thenReturn(Optional.of(user));
-            when(jwtService.generatePasswordResetToken(any(), any(), any())).thenReturn(RESET_TOKEN);
+            when(passwordFingerprintService.compute(any())).thenReturn("fingerprint-abc");
+            when(jwtService.generatePasswordResetToken(any(), any())).thenReturn(RESET_TOKEN);
             doThrow(new RuntimeException("Email failed")).when(emailService)
-                .sendPasswordResetEmail(any(), any(), any());
+                    .sendPasswordResetEmail(any(), any(), any());
 
             assertThatThrownBy(() -> authService.forgotPassword(request))
-                .isInstanceOf(RuntimeException.class)
-                .hasMessage("Email failed");
+                    .isInstanceOf(RuntimeException.class)
+                    .hasMessage("Email failed");
         }
     }
 
@@ -378,11 +403,12 @@ class AuthServiceTest {
             ResetPasswordRequest request = resetPasswordRequest();
             User user = persistedUser();
             JwtService.ResetPasswordData data =
-                new JwtService.ResetPasswordData(1L, "new@email.com", ENCODED_PASSWORD);
+                    new JwtService.ResetPasswordData(1L, "fingerprint-abc");
 
             when(jwtService.isResetPasswordToken(RESET_TOKEN)).thenReturn(true);
             when(jwtService.extractResetPasswordData(RESET_TOKEN)).thenReturn(data);
             when(userRepository.findById(1L)).thenReturn(Optional.of(user));
+            when(passwordFingerprintService.matches(ENCODED_PASSWORD, "fingerprint-abc")).thenReturn(true);
             when(passwordEncoder.encode(NEW_PASSWORD)).thenReturn(NEW_ENCODED);
 
             ResetPasswordResponse response = authService.resetPassword(request);
@@ -399,7 +425,7 @@ class AuthServiceTest {
             when(jwtService.isResetPasswordToken(RESET_TOKEN)).thenReturn(false);
 
             assertThatThrownBy(() -> authService.resetPassword(request))
-                .isInstanceOf(InvalidResetPasswordTokenException.class);
+                    .isInstanceOf(InvalidResetPasswordTokenException.class);
         }
 
         @Test
@@ -410,7 +436,7 @@ class AuthServiceTest {
             when(jwtService.extractResetPasswordData(RESET_TOKEN)).thenThrow(new RuntimeException());
 
             assertThatThrownBy(() -> authService.resetPassword(request))
-                .isInstanceOf(InvalidResetPasswordTokenException.class);
+                    .isInstanceOf(InvalidResetPasswordTokenException.class);
         }
 
         @Test
@@ -418,14 +444,14 @@ class AuthServiceTest {
         void shouldThrowWhenUserNotFound() {
             ResetPasswordRequest request = resetPasswordRequest();
             JwtService.ResetPasswordData data =
-                new JwtService.ResetPasswordData(999L, "ghost@email.com", "hash");
+                    new JwtService.ResetPasswordData(999L, "fingerprint-ghost");
 
             when(jwtService.isResetPasswordToken(RESET_TOKEN)).thenReturn(true);
             when(jwtService.extractResetPasswordData(RESET_TOKEN)).thenReturn(data);
             when(userRepository.findById(999L)).thenReturn(Optional.empty());
 
             assertThatThrownBy(() -> authService.resetPassword(request))
-                .isInstanceOf(InvalidResetPasswordTokenException.class);
+                    .isInstanceOf(InvalidResetPasswordTokenException.class);
         }
 
         @Test
@@ -435,15 +461,16 @@ class AuthServiceTest {
             User user = persistedUser();
             user.setPasswordHash("$2a$12$differentHash");
             JwtService.ResetPasswordData data =
-                new JwtService.ResetPasswordData(1L, "new@email.com", ENCODED_PASSWORD);
+                    new JwtService.ResetPasswordData(1L, "fingerprint-abc");
 
             when(jwtService.isResetPasswordToken(RESET_TOKEN)).thenReturn(true);
             when(jwtService.extractResetPasswordData(RESET_TOKEN)).thenReturn(data);
             when(userRepository.findById(1L)).thenReturn(Optional.of(user));
+            when(passwordFingerprintService.matches("$2a$12$differentHash", "fingerprint-abc")).thenReturn(false);
 
             assertThatThrownBy(() -> authService.resetPassword(request))
-                .isInstanceOf(InvalidResetPasswordTokenException.class)
-                .hasMessageContaining("already been used");
+                    .isInstanceOf(InvalidResetPasswordTokenException.class)
+                    .hasMessageContaining("already been used");
         }
     }
 }

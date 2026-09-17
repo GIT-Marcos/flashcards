@@ -32,12 +32,14 @@ class JwtServiceTest {
 
     private JwtService jwtService;
     private final Clock clock = Clock.fixed(
-        Instant.parse("2025-01-01T00:00:00Z"),
-        ZoneOffset.UTC
+            Instant.parse("2025-01-01T00:00:00Z"),
+            ZoneOffset.UTC
     );
 
     private static final long JWT_EXPIRATION_MS = 900_000L;       // 15 min
     private static final long REFRESH_EXPIRATION_MS = 6_048_000_00L; // 7 days
+    private static final long RESET_EXPIRATION_MS = 900_000L;     // 15 min
+    private static final String PWD_FINGERPRINT = "fingerprint-abc";
 
     private SecurityUser securityUser;
 
@@ -52,6 +54,7 @@ class JwtServiceTest {
         properties.getSecurity().getJwt().setSecretKey(base64Key);
         properties.getSecurity().getJwt().setExpiration(JWT_EXPIRATION_MS);
         properties.getSecurity().getJwt().getRefreshToken().setExpiration(REFRESH_EXPIRATION_MS);
+        properties.getSecurity().setResetTokenExpiration(RESET_EXPIRATION_MS);
 
         jwtService = new JwtService(properties, clock);
 
@@ -130,6 +133,51 @@ class JwtServiceTest {
             Claims claims = jwtService.extractAllClaims(token);
 
             assertThat(claims.get("userId", Long.class)).isEqualTo(1L);
+        }
+    }
+
+    @Nested
+    @DisplayName("generatePasswordResetToken")
+    class GeneratePasswordResetToken {
+
+        @Test
+        @DisplayName("should contain PASSWORD_RESET token type, userId subject and pwdFingerprint claim")
+        void shouldContainResetClaims() {
+            String token = jwtService.generatePasswordResetToken(1L, PWD_FINGERPRINT);
+            Claims claims = jwtService.extractAllClaims(token);
+
+            assertThat(claims.get("tokenType", String.class)).isEqualTo(TokenType.PASSWORD_RESET);
+            assertThat(claims.getSubject()).isEqualTo("1");
+            assertThat(claims.get("pwdFingerprint", String.class)).isEqualTo(PWD_FINGERPRINT);
+        }
+
+        @Test
+        @DisplayName("should NOT contain passwordHash or email claims")
+        void shouldNotContainSensitiveClaims() {
+            String token = jwtService.generatePasswordResetToken(1L, PWD_FINGERPRINT);
+            Claims claims = jwtService.extractAllClaims(token);
+
+            assertThat(claims).doesNotContainKeys("passwordHash", "email");
+        }
+
+        @Test
+        @DisplayName("should round-trip via extractResetPasswordData")
+        void shouldRoundTripResetPasswordData() {
+            String token = jwtService.generatePasswordResetToken(1L, PWD_FINGERPRINT);
+
+            JwtService.ResetPasswordData data = jwtService.extractResetPasswordData(token);
+
+            assertThat(data).isEqualTo(new JwtService.ResetPasswordData(1L, PWD_FINGERPRINT));
+        }
+
+        @Test
+        @DisplayName("should expire RESET_EXPIRATION_MS after issuance")
+        void shouldExpireAfterResetExpiration() {
+            String token = jwtService.generatePasswordResetToken(1L, PWD_FINGERPRINT);
+            Claims claims = jwtService.extractAllClaims(token);
+
+            assertThat(claims.getExpiration().toInstant())
+                    .isEqualTo(Instant.parse("2025-01-01T00:15:00Z"));
         }
     }
 
@@ -212,7 +260,7 @@ class JwtServiceTest {
         void shouldThrowWhenExpired() {
             var props = new ApplicationProperties();
             props.getSecurity().getJwt().setSecretKey(
-                Base64.getEncoder().encodeToString(new byte[32])
+                    Base64.getEncoder().encodeToString(new byte[32])
             );
             props.getSecurity().getJwt().setExpiration(-1_000L);
             var svc = new JwtService(props, clock);
@@ -220,7 +268,7 @@ class JwtServiceTest {
             String token = svc.generateToken(securityUser);
 
             assertThatThrownBy(() -> svc.isTokenValid(token, securityUser))
-                .isInstanceOf(ExpiredJwtException.class);
+                    .isInstanceOf(ExpiredJwtException.class);
         }
     }
 }
