@@ -34,6 +34,15 @@
       },
       "enabled": true
     },
+    "github": {
+      "type": "remote",
+      "url": "https://api.githubcopilot.com/mcp",
+      "oauth": false,
+      "headers": {
+        "Authorization": "Bearer {env:GITHUB_MCP_TOKEN_FLASHCARDS}"
+      },
+      "enabled": true
+    },
     "render": {
       "type": "remote",
       "url": "https://mcp.render.com/mcp",
