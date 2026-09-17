@@ -105,7 +105,7 @@ separando responsabilidades de presentación, lógica de negocio y persistencia.
 * **Migración:** Flyway.
 * **Herramientas:** Maven, Docker.
 * **Documentación API:** Springdoc OpenAPI (Swagger UI).
-* **Rate Limiting:** Bucket4j 8.10.1.
+* **Rate Limiting:** Bucket4j 8.10.1 + Caffeine 3.2.4 (cache de buckets acotado).
 * **Métricas:** Micrometer + Prometheus.
 * **Templates:** Thymeleaf (emails HTML).
 * **Email:** Maileroo REST API (maileroo-java-sdk 1.0.0) + Spring Retry 2.0.13.
@@ -364,17 +364,17 @@ El sistema utiliza un formato estandarizado basado en **ProblemDetail (RFC-9457)
 
 ```json
 {
-    "content": [
-        {
-            "id": 1,
-            "name": "Java Basics",
-            "hasPendingCards": true,
-            "totalCards": 15,
-            "createdAt": "2026-05-01T10:00:00Z"
-        }
-    ],
-    "hasNext": false,
-    "nextCursor": null
+  "content": [
+    {
+      "id": 1,
+      "name": "Java Basics",
+      "hasPendingCards": true,
+      "totalCards": 15,
+      "createdAt": "2026-05-01T10:00:00Z"
+    }
+  ],
+  "hasNext": false,
+  "nextCursor": null
 }
 ```
 
@@ -394,11 +394,11 @@ El sistema utiliza un formato estandarizado basado en **ProblemDetail (RFC-9457)
 
 ```json
 {
-    "type": "about:blank",
-    "title": "Conflict",
-    "status": 409,
-    "detail": "The resource was modified by another request. Please retry.",
-    "instance": "/reviews/card/42"
+  "type": "about:blank",
+  "title": "Conflict",
+  "status": 409,
+  "detail": "The resource was modified by another request. Please retry.",
+  "instance": "/reviews/card/42"
 }
 ```
 
@@ -462,11 +462,19 @@ Los cálculos se realizan a partir del algoritmo **SuperMemo-2**:
 #### Borrado de Datos
 
 - Se realizan borrados físicos en cascada según la dependencia de las entidades.
+- **Borrado de `User`**: destruye todo lo que el usuario posee — `decks`, `cards`, `study_sessions` y
+  `card_review_log` (vía `ON DELETE CASCADE` sobre `user_id` y `session_id`). Es la única operación que elimina
+  historial de estudio.
+- **Borrado de `Deck` o `Card`**: elimina mazos y tarjetas, pero **preserva** `card_review_log` y `study_sessions`.
 - Preservación de historial de reviews: cuando se elimina una Card, sus registros en `card_review_log` se preservan para
   mantener las estadísticas del usuario.
 - La columna `card_id` es nullable y la FK usa `ON DELETE SET NULL`, de modo que la BD nullifica automáticamente la
   referencia al borrar la card. Esto permite que `GET /sessions/stats` devuelva métricas precisas incluso para cards
   eliminadas.
+- **Mecanismo**: los borrados de `User` y `Deck` se ejecutan con una única sentencia bulk
+  (`UserRepository.bulkDeleteById`, `DeckRepository.bulkDeleteById`) y delegan el cascado en las acciones referenciales
+  definidas en Flyway (V1), que es la fuente de verdad del esquema. **No** debe reintroducirse `cascade`/`orphanRemoval`
+  en JPA para este fin: cargaría el grafo completo en memoria para emitir un DELETE por fila.
 
 #### Control de Concurrencia (Optimistic Locking)
 
@@ -735,18 +743,28 @@ Todos usan:
 
 #### Limitación de Peticiones (Rate Limiting)
 
-Implementado con **Bucket4j** mediante `RateLimitingFilter` + `RateLimitingConfig`:
+Implementado con **Bucket4j** + **Caffeine** mediante `RateLimitingFilter` + `RateLimitingConfig`:
 
 - **Alcance:** Solo se aplica a rutas `/auth/**` (signup, confirm, login, refresh-token, logout, forgot-password,
   reset-password).
 - **Algoritmo:** Token-bucket por IP + path.
-- **Bucket:** Creado por clave `{clientIP}:{path}` en un `ConcurrentHashMap`.
+- **Bucket:** Creado por clave `{clientIP}:{path}` en un cache **Caffeine** (`Cache<String, Bucket>`), que acota la
+  memoria y elimina el crecimiento ilimitado del `ConcurrentHashMap` original.
+- **Evicción:** Doble política — `maximumSize` (techo duro de entradas) + `expireAfterAccess` (TTL por inactividad).
+- **Invariante de TTL:** `expireAfterAccess` >= tiempo de refill completo del endpoint más lento
+  (`forgot-password`: 3 tokens × 600s = 30 min; default 1h). Un bucket evictado por inactividad es equivalente a un
+  bucket fresco ya rellenado, por lo que la evicción nunca otorga capacidad extra.
 - **Refill:** Greedy (los tokens se regeneran inmediatamente al ritmo configurado).
 - **Excedido:** Responde con `429 Too Many Requests` + header `Retry-After`.
-- **IP del cliente:** Resuelta desde header `X-Forwarded-For` (primera IP) o `request.getRemoteAddr()`.
+- **IP del cliente:** Derivada por Tomcat (`RemoteIpValve`, habilitado con `server.forward-headers-strategy: native`):
+  recorre `X-Forwarded-For` de derecha a izquierda confiando solo en hops que matcheen
+  `server.tomcat.remoteip.internal-proxies` (default: rangos privados). El filtro consume `request.getRemoteAddr()`.
+  El primer valor de XFF — controlable por el cliente — nunca se lee, lo que previene el spoofing y el bypass del
+  límite por IP.
 - **Configuración:** Se define por endpoint en `application-*.yaml` bajo la propiedad
   `rate-limiter.auth.{signup,confirm,login,refresh-token,logout,forgot-password,reset-password}` con campos `capacity`,
-  `refillTokens`, `refillPeriod`.
+  `refillTokens`, `refillPeriod`. El cache de buckets se configura bajo `rate-limiter.cache` con campos
+  `maximum-size` (default: `100000`) y `expire-after-access` (default: `1h`).
 
 #### Prevención de Vulnerabilidades
 
@@ -1065,6 +1083,26 @@ V1 --> U1
 | 9  | Pirámide de tests (§8)          | Unit 15→21, Controller 8→9, Integration 13→14, Total 43→51.                                  |
 | 10 | Migraciones Flyway (AGENTS.md)  | Actualizado de V1-V7 a V1-V8.                                                                |
 
+### 11.11 Rate Limiting: Cache de Buckets Acotado con Caffeine
+
+| # | Cambio                                 | Descripción                                                                                                                                            |
+|---|----------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------|
+| 1 | Dependencia Caffeine 3.2.4             | Agregada al `pom.xml` sin versión explícita (gestionada por el BOM de Spring Boot 4.1.1).                                                              |
+| 2 | `ConcurrentHashMap` → `Cache` Caffeine | `RateLimitingFilter` almacena los buckets en un cache acotado con `maximumSize` + `expireAfterAccess`, eliminando el crecimiento ilimitado de memoria. |
+| 3 | `RateLimitingConfig.CacheConfig`       | Nueva clase anidada con `maximumSize` (default 100000) y `expireAfterAccess` (default 1h), bindeada a `rate-limiter.cache.*`.                          |
+| 4 | Configuración en `application.yaml`    | Agregada sección `rate-limiter.cache` con `maximum-size` y `expire-after-access`.                                                                      |
+| 5 | Test de evicción                       | Nuevo `RateLimitingFilterEvictionTest` (paquete `security`) valida que al alcanzar `maximumSize` los buckets se evictan.                               |
+| 6 | SDD actualizado                        | §5.3, §7.1 (Limitación de Peticiones) y EC-005 actualizados con el nuevo diseño.                                                                       |
+
+### 11.12 Rate Limiting: Prevención de Spoofing de X-Forwarded-For
+
+| # | Cambio                                    | Descripción                                                                                                                         |
+|---|-------------------------------------------|-------------------------------------------------------------------------------------------------------------------------------------|
+| 1 | `server.forward-headers-strategy: native` | Habilita `RemoteIpValve` de Tomcat: IP del cliente derivada derecha→izquierda con lista de proxies confiables (`internal-proxies`). |
+| 2 | Eliminado `getClientIp()`                 | `RateLimitingFilter` consume `request.getRemoteAddr()`; se elimina el parsing manual del primer valor de XFF (spoofeable).          |
+| 3 | Test de regresión                         | El test de XFF se invierte: el header debe ser ignorado (misma `remoteAddr` + XFF rotativos → mismo bucket → 429).                  |
+| 4 | EC-009 documentado                        | Edge case del modelo de confianza (regex `internal-proxies`) agregado a §13.                                                        |
+
 ---
 
 ## 12. Glosario
@@ -1080,3 +1118,28 @@ V1 --> U1
 9. **Easiness Factor (EF):** Factor de facilidad que mide la dificultad percibida de una tarjeta (mínimo 1.3).
 10. **Cursor Pagination:** Técnica de paginación basada en un cursor (ID/fecha) en lugar de offset, más eficiente para
     grandes volúmenes.
+
+---
+
+## 13. Edge Cases y Comportamientos Tolerados
+
+Esta sección documenta situaciones límite conocidas del sistema, su causa, efecto observable y si están
+toleradas. Se actualiza cuando se descubren nuevos edge cases o cuando cambia la tolerancia ante uno existente.
+
+**Convención de tolerancia:**
+
+- **Sí:** El comportamiento es aceptable. No requiere fix.
+- **Parcial:** El comportamiento es aceptable pero tiene limitaciones conocidas.
+- **No:** El comportamiento es inaceptable. Requiere fix o mitigación activa.
+
+| ID     | Componente              | Descripción                                                                                                                                                                     | Causa                                                                                                                                                                             | Efecto                                                                                                           | Tolerado                                                                                                                                                                             | Mitigación                                                                                                                                                                                                      |
+|--------|-------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|------------------------------------------------------------------------------------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| EC-001 | `StudySession`          | Sesión creada sin reviews queda con `durationSeconds = 0` y `cardsReviewed = 0` visible en `GET /sessions`                                                                      | La sesión se crea antes de que exista cualquier `CardReviewLog`. Si la app crashea entre la creación de la sesión y la primera review persistida, queda una sesión huérfana.      | Sesión vacía aparece en el historial del usuario con duración 0.                                                 | **Sí** — La ventana de crash es del orden de milisegundos. `GET /sessions/stats` no usa `endTime`. El `SessionMapper` aplica `Math.max(0L, ...)` para prevenir duraciones negativas. | Ninguna activa. Considerar limpieza periódica de sesiones con `cardsReviewed = 0` si el volumen lo justifica.                                                                                                   |
+| EC-002 | `ReviewService`         | Review concurrente en la misma tarjeta produce HTTP 409 Conflict                                                                                                                | Optimistic locking via `@Version` en `Card`. Dos transacciones intentan actualizar la misma fila simultáneamente.                                                                 | La segunda request falla con 409.                                                                                | **Sí** — El cliente debe reintentar. Es el comportamiento estándar para optimistic locking.                                                                                          | `@Version` en la entidad `Card`. El frontend debe manejar 409 con retry.                                                                                                                                        |
+| EC-003 | `SessionService`        | Reuso de sesión depende de `sessionThreshold` (minutos) + accounting day. Si el usuario cruza medianoche en su zona horaria, se crea sesión nueva aunque haya reviews recientes | La lógica de reuso verifica que el último `CardReviewLog` esté dentro del `sessionThreshold` **y** en el mismo accounting day (offset por `user.startOfDay` en su IANA timezone). | Dos sesiones para un mismo bloque de estudio continuo si cruza medianoche.                                       | **Sí** — Diseño intencional para separar días de estudio. Permite métricas diarias limpias.                                                                                          | `SessionService.isSessionActive()` verifica ambos criterios. El `startOfDay` del usuario controla el offset.                                                                                                    |
+| EC-004 | `MailerooClient`        | Webhook `failed` resetea `lastNotificationSent` a `null`; el scheduler re-envía al usuario en la próxima ejecución horaria                                                      | Al recibir un evento `failed` en `POST /webhook/maileroo`, se revierte el timestamp de notificación para que el scheduler no asuma que el email fue enviado exitosamente.         | El usuario puede recibir un email duplicado si el primer envío falló después de haber sido marcado como enviado. | **Sí** — Comportamiento intencional. Es preferible un email duplicado a uno perdido.                                                                                                 | Webhook controller resetea `lastNotificationSent = null`. El scheduler re-evaluate en la próxima ejecución (`NOTIFY_CRON`).                                                                                     |
+| EC-005 | `AuthService`           | Rate limiting en endpoints de auth (login, register, refresh-token, logout). Límites configurables en `application.yaml` bajo `rate-limiter`                                    | Protección contra brute force y abuso de tokens. Bucket4j en cache Caffeine acotado (`maximumSize` + `expireAfterAccess`).                                                        | Requests que exceden el límite reciben HTTP 429 Too Many Requests.                                               | **Sí** — Protección contra ataques. Los límites son configurables por perfil.                                                                                                        | `RateLimitingFilter` se ejecuta antes de `JwtAuthenticationFilter` en la cadena de seguridad. Configurable por endpoint. IP del cliente resuelta por `RemoteIpValve` (sin confianza en el primer valor de XFF). |
+| EC-006 | `KeyReEncryptionRunner` | Si `API_KEY_ENCRYPTION_SECRET_V2` está presente pero la verificación post-re-encrypt falla, la app **no arranca**                                                               | La verificación descifra cada key migrada con V2 y compara con el valor original. Si alguna falla, se aborta para prevenir datos corruptos en producción.                         | La aplicación falla al iniciar con un error explícito en logs.                                                   | **No tolerado** — Aborto intencional. Preferir no arrancar que servir con datos cifrados ilegibles.                                                                                  | `KeyReEncryptionRunner` verifica cada key migrada. Si falla, lanza excepción y Spring Boot no completa el arranque.                                                                                             |
+| EC-007 | `TimeZoneInterceptor`   | Header `Time-Zone` inválido (no IANA) se ignora silenciosamente; la zona del usuario no se actualiza                                                                            | `TimeZoneInterceptor` valida el header contra `ZoneId.of()`. Si lanza `DateTimeException`, se descarta el header y se usa la zona existente del usuario.                          | La request procede con la zona horaria previamente configurada. No hay error visible.                            | **Sí** — Fallback a zona existente. No rompe la request. Evita 400s por headers malformados.                                                                                         | `TimeZoneInterceptor` valida y descarta silenciosamente. Solo aplica en `/auth/login`, `/auth/refresh-token`, `/reviews/**`.                                                                                    |
+| EC-008 | SM-2                    | Quality < 3 (fail) resetea `repetitionCount` a 0 pero `EF` se actualiza normalmente                                                                                             | Diseño del algoritmo SM-2 original (Wozniak, 1987). Un fallo reinicia el conteo de repeticiones pero ajusta el factor de dificultad.                                              | La tarjeta vuelve a intervalos cortos (1 día) pero con un EF que refleja la dificultad percibida.                | **Sí** — Comportamiento estándar del algoritmo SM-2. No es un bug.                                                                                                                   | Fórmula SM-2: `EF' = EF + (0.1 - (5-q)*(0.08 + (5-q)*0.02))`, clamped a mínimo 1.3. Fail path: `intervalDays = 1`, `repetitionCount = 0`.                                                                       |
+| EC-009 | `RateLimitingFilter`    | Si `internal-proxies` no matchea la IP del proxy de Render, `getRemoteAddr()` retorna la IP del LB para todos los usuarios                                                      | El `RemoteIpValve` solo procesa XFF cuando el peer TCP es un proxy confiable según el regex (`server.tomcat.remoteip.internal-proxies`).                                          | Todos los clientes comparten un único bucket por endpoint (límite semi-global en `/auth/**`).                    | **No** — Fallo de disponibilidad; debe detectarse en el checklist post-deploy.                                                                                                       | Checklist post-deploy: si todos los usuarios colapsan en el mismo límite, obtener el rango del LB (access log de Tomcat) y ajustar `server.tomcat.remoteip.internal-proxies`.                                   |

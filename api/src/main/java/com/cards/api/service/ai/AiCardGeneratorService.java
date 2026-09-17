@@ -18,22 +18,22 @@ import java.util.List;
 public class AiCardGeneratorService {
 
     private static final String SYSTEM_PROMPT = """
-        You are a flashcard generator. Extract key concepts from the provided text and create
-        question-answer pairs. Return a JSON array of objects with "front" (question, max 255
-        characters) and "back" (answer, max 5000 characters). Each front must be distinct.
-        Focus on important concepts, definitions, and relationships.
-        Create between 3 and 50 cards.
-        Return ONLY valid JSON, no markdown, no explanation.
-        """.stripIndent();
+            You are a flashcard generator. Extract key concepts from the provided text and create
+            question-answer pairs. Return a JSON array of objects with "front" (question, max 255
+            characters) and "back" (answer, max 5000 characters). Each front must be distinct.
+            Focus on important concepts, definitions, and relationships.
+            Create between 3 and 50 cards.
+            Return ONLY valid JSON, no markdown, no explanation.
+            """.stripIndent();
 
     private static final String SYSTEM_PROMPT_TOPIC = """
-        You are a flashcard generator. Given the following topic, create
-        question-answer pairs to help study it. Return a JSON array of objects
-        with "front" (question, max 255 characters) and "back" (answer, max 5000
-        characters). Each front must be distinct. Focus on important concepts,
-        definitions, and relationships. Create between 3 and 50 cards.
-        Return ONLY valid JSON, no markdown, no explanation.
-        """.stripIndent();
+            You are a flashcard generator. Given the following topic, create
+            question-answer pairs to help study it. Return a JSON array of objects
+            with "front" (question, max 255 characters) and "back" (answer, max 5000
+            characters). Each front must be distinct. Focus on important concepts,
+            definitions, and relationships. Create between 3 and 50 cards.
+            Return ONLY valid JSON, no markdown, no explanation.
+            """.stripIndent();
 
     private final FileParserService fileParser;
     private final UserApiKeyService apiKeyService;
@@ -51,7 +51,6 @@ public class AiCardGeneratorService {
         this.deckService = deckService;
     }
 
-    @Transactional
     public AiGenerationResponse generateCardsInDeck(Long deckId, Long userId, String filename,
                                                     byte[] fileContent, AiProvider provider, String model) {
         var text = fileParser.parse(filename, fileContent);
@@ -59,13 +58,9 @@ public class AiCardGeneratorService {
         var client = clientFactory.getClient(provider);
 
         var flashcards = callAi(client, apiKey, text, model, provider, SYSTEM_PROMPT);
-        var result = createCards(flashcards, deckId, userId);
-        var deck = deckService.getDeckById(deckId, userId);
-
-        return new AiGenerationResponse(deck, result.cards, result.cards.size(), result.skipped);
+        return persistCardsInDeck(flashcards, deckId, userId);
     }
 
-    @Transactional
     public AiGenerationResponse generateDeckWithCards(Long userId, String filename, byte[] fileContent,
                                                       AiProvider provider, String deckName, String model) {
         var text = fileParser.parse(filename, fileContent);
@@ -73,22 +68,29 @@ public class AiCardGeneratorService {
         var client = clientFactory.getClient(provider);
 
         var flashcards = callAi(client, apiKey, text, model, provider, SYSTEM_PROMPT);
-        var deck = deckService.create(userId, new CreateDeckRequest(deckName));
-        var result = createCards(flashcards, deck.id(), userId);
-
-        return new AiGenerationResponse(deck, result.cards, result.cards.size(), result.skipped);
+        return persistDeckWithCards(flashcards, userId, deckName);
     }
 
-    @Transactional
     public AiGenerationResponse generateDeckFromTopic(Long userId, String prompt,
                                                       AiProvider provider, String deckName, String model) {
         var apiKey = apiKeyService.getDecryptedKey(userId, provider);
         var client = clientFactory.getClient(provider);
 
         var flashcards = callAi(client, apiKey, prompt, model, provider, SYSTEM_PROMPT_TOPIC);
+        return persistDeckWithCards(flashcards, userId, deckName);
+    }
+
+    @Transactional
+    public AiGenerationResponse persistCardsInDeck(List<Flashcard> flashcards, Long deckId, Long userId) {
+        var result = createCards(flashcards, deckId, userId);
+        var deck = deckService.getDeckById(deckId, userId);
+        return new AiGenerationResponse(deck, result.cards, result.cards.size(), result.skipped);
+    }
+
+    @Transactional
+    public AiGenerationResponse persistDeckWithCards(List<Flashcard> flashcards, Long userId, String deckName) {
         var deck = deckService.create(userId, new CreateDeckRequest(deckName));
         var result = createCards(flashcards, deck.id(), userId);
-
         return new AiGenerationResponse(deck, result.cards, result.cards.size(), result.skipped);
     }
 

@@ -1,11 +1,11 @@
 package com.cards.api.service;
 
+import com.cards.api.entity.PendingRegistration;
 import com.cards.api.entity.User;
 import com.cards.api.exception.domain.DuplicatedUserEmailException;
 import com.cards.api.exception.domain.DuplicatedUsernameException;
 import com.cards.api.exception.domain.InvalidEmailVerificationException;
 import com.cards.api.repo.UserRepository;
-import com.cards.api.util.TokenType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -19,53 +19,47 @@ public class VerificationService {
 
     private static final Logger log = LoggerFactory.getLogger(VerificationService.class);
 
-    private final JwtService jwtService;
+    private final PendingRegistrationService pendingRegistrationService;
     private final UserRepository userRepository;
 
-    public VerificationService(JwtService jwtService, UserRepository userRepository) {
-        this.jwtService = jwtService;
+    public VerificationService(PendingRegistrationService pendingRegistrationService, UserRepository userRepository) {
+        this.pendingRegistrationService = pendingRegistrationService;
         this.userRepository = userRepository;
     }
 
     public void validateTokenStructure(String token) {
-        jwtService.extractAllClaims(token);
+        pendingRegistrationService.findValidByToken(token)
+                .orElseThrow(() -> new InvalidEmailVerificationException(
+                        "This verification link is invalid or has expired. Please sign up again."));
     }
 
     @Transactional
     public void confirmEmail(String token) {
-        JwtService.VerifyData data;
-        try {
-            data = jwtService.extractVerificationData(token);
-        } catch (Exception ex) {
-            throw new InvalidEmailVerificationException(
-                "This verification link is invalid or has expired. Please sign up again.");
-        }
+        PendingRegistration pending = pendingRegistrationService.findValidByToken(token)
+                .orElseThrow(() -> new InvalidEmailVerificationException(
+                        "This verification link is invalid or has expired. Please sign up again."));
 
-        if (!jwtService.isTokenType(token, TokenType.VERIFY_EMAIL)) {
-            throw new InvalidEmailVerificationException(
-                "This verification link is invalid or has expired. Please sign up again.");
-        }
+        if (userRepository.existsByUsernameIgnoreCase(pending.getUsername()))
+            throw new DuplicatedUsernameException(pending.getUsername());
 
-        if (userRepository.existsByUsernameIgnoreCase(data.username()))
-            throw new DuplicatedUsernameException(data.username());
-
-        if (userRepository.existsByEmailIgnoreCase(data.email().toLowerCase(Locale.ROOT)))
-            throw new DuplicatedUserEmailException(data.email());
+        if (userRepository.existsByEmailIgnoreCase(pending.getEmail().toLowerCase(Locale.ROOT)))
+            throw new DuplicatedUserEmailException(pending.getEmail());
 
         User user = User.builder()
-            .username(data.username())
-            .email(data.email())
-            .passwordHash(data.passwordHash())
-            .roles(Set.of(User.UserRole.ROLE_USER))
-            .zoneInfo(data.zoneInfo())
-            .build();
+                .username(pending.getUsername())
+                .email(pending.getEmail())
+                .passwordHash(pending.getPasswordHash())
+                .roles(Set.of(User.UserRole.ROLE_USER))
+                .zoneInfo(pending.getZoneInfo())
+                .build();
 
         try {
             userRepository.save(user);
+            pendingRegistrationService.delete(pending);
         } catch (Exception ex) {
-            log.warn("Failed to create user from verification token: {}", ex.getMessage(), ex);
+            log.warn("Failed to create user from pending registration: {}", ex.getMessage(), ex);
             throw new InvalidEmailVerificationException(
-                "This verification link is invalid or has expired. Please sign up again.");
+                    "This verification link is invalid or has expired. Please sign up again.");
         }
     }
 }

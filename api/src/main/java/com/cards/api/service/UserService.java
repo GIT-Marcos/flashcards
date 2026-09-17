@@ -4,6 +4,7 @@ import com.cards.api.dto.request.PatchUserRequest;
 import com.cards.api.dto.response.UserResponse;
 import com.cards.api.entity.User;
 import com.cards.api.exception.ResourceNotFoundException;
+import com.cards.api.exception.domain.DataIntegrityException;
 import com.cards.api.exception.domain.DuplicatedUserEmailException;
 import com.cards.api.exception.domain.DuplicatedUsernameException;
 import com.cards.api.mapper.UserMapper;
@@ -92,7 +93,7 @@ public class UserService {
             if ("uk_users_email_lower".equals(constraintName)) {
                 throw new DuplicatedUserEmailException(request.email());
             }
-            throw new BadCredentialsException("Error while saving - Data integrity violation");
+            throw new DataIntegrityException("Error while saving - Data integrity violation");
         }
     }
 
@@ -110,6 +111,6 @@ public class UserService {
         if (!userRepo.existsById(authUserId))
             throw new ResourceNotFoundException("User not found");
 
-        userRepo.deleteById(authUserId);
+        userRepo.bulkDeleteById(authUserId);
     }
 }

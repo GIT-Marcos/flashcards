@@ -48,60 +48,87 @@ A hybrid approach where the landing page auto-submits the form via JavaScript on
 
 ```mermaid
 sequenceDiagram
-    actor User
-    participant Frontend as Frontend (React)
-    participant API as API (Spring Boot)
-    participant Maileroo as Maileroo (Email)
-    Note over User, API: 1. Signup
-    User ->> Frontend: Fill registration form
-    Frontend ->> API: POST /auth/signup
-    API ->> API: Validate, check uniqueness,<br/>hash password, generate JWT
-    API ->> Maileroo: Send verification email<br/>(retry 3x + metrics)
-    API -->> Frontend: 202 Accepted
-    Frontend -->> User: "Check your email"
-    Note over User, Maileroo: 2. Email delivery
-    Maileroo -->> User: Email with confirmation link
-    Note over User, API: 3. Email client prefetch (GET)
-    User ->> API: (prefetch) GET /auth/confirm?token=JWT
-    API -->> User: Landing page (confirm-email.html)<br/>— idempotent, no side effects
-    Note over User, API: 4. User confirmation (POST)
-    User ->> API: Click button → POST /auth/confirm
-    API ->> API: Validate JWT, check uniqueness,<br/>create User via VerificationService
-    API -->> User: Success page (email-verified.html)<br/>"You can now log in"
-    Note over User, API: 5. Login
-    User ->> Frontend: Navigate to login page
-    Frontend ->> API: POST /auth/login
-    API -->> Frontend: JWT tokens
-    Frontend -->> User: Redirect to app
+  actor User
+  participant Frontend as Frontend (React)
+  participant API as API (Spring Boot)
+  participant Maileroo as Maileroo (Email)
+  Note over User, API: 1. Signup
+  User ->> Frontend: Fill registration form
+  Frontend ->> API: POST /auth/signup
+  API ->> API: Validate, check uniqueness,<br/>hash password, store pending registration<br/>(SHA-256 of opaque token, TTL 24h)
+  API ->> Maileroo: Send verification email<br/>(retry 3x + metrics)
+  API -->> Frontend: 202 Accepted
+  Frontend -->> User: "Check your email"
+  Note over User, Maileroo: 2. Email delivery
+  Maileroo -->> User: Email with confirmation link
+  Note over User, API: 3. Email client prefetch (GET)
+  User ->> API: (prefetch) GET /auth/confirm?token=<opaque>
+  API -->> User: Landing page (confirm-email.html)<br/>— idempotent, no side effects
+  Note over User, API: 4. User confirmation (POST)
+  User ->> API: Click button → POST /auth/confirm
+  API ->> API: Look up pending row by token hash,<br/>check uniqueness, create User,<br/>delete pending row (same tx)
+  API -->> User: Success page (email-verified.html)<br/>"You can now log in"
+  Note over User, API: 5. Login
+  User ->> Frontend: Navigate to login page
+  Frontend ->> API: POST /auth/login
+  API -->> Frontend: JWT tokens
+  Frontend -->> User: Redirect to app
 ```
 
-## JWT Structure
+## Token Structure
 
-The verification token (`TokenType.VERIFY_EMAIL`) is a JWT signed with HMAC-SHA256 (same key as access/refresh tokens):
+The verification token is an **opaque random token**: 32 bytes generated with a CSPRNG (`SecureRandom`), Base64URL-
+encoded without padding (43 characters). It carries no user data — no password hash, no PII.
 
-| Claim           | Value                     |
-|-----------------|---------------------------|
-| `tokenType`     | `"VERIFY_EMAIL"`          |
-| `sub` (subject) | `username`                |
-| `email`         | `email`                   |
-| `passwordHash`  | BCrypt hash (strength 12) |
-| `zoneInfo`      | IANA timezone string      |
-| `exp`           | 24h from issuance         |
-| `iat`           | Issuance timestamp        |
+The pending registration lives server-side in the `pending_registrations` table:
 
-The JWT is the single source of truth — no DB storage is needed for pending registrations.
+| Column          | Value                                      |
+|-----------------|--------------------------------------------|
+| `username`      | Requested username                         |
+| `email`         | Requested email                            |
+| `password_hash` | BCrypt hash (strength 12)                  |
+| `zone_info`     | IANA timezone string (validated at signup) |
+| `token_hash`    | `SHA-256` (hex) of the opaque token        |
+| `expires_at`    | `verification-token-expiration` (24h)      |
+
+Only the SHA-256 of the token is stored: a database compromise does not yield usable tokens, and an intercepted email
+yields no user data at all. Functional unique indexes on `LOWER(username)` and `LOWER(email)` mirror the `users`
+constraints and resolve concurrent signups.
 
 ## Security Considerations
 
-- **Password hash in JWT**: The BCrypt hash is computationally infeasible to reverse. The JWT is transmitted over HTTPS,
-  signed (tamper-proof), and expires in 24h.
-- **Replay prevention**: The username and email unique constraints ensure a token can only be used once. A second
-  attempt fails because the user already exists.
+- **No sensitive data in the token**: The opaque token carries nothing decodable. The BCrypt hash never leaves the
+  server — it moves from the signup request straight into `pending_registrations`.
+- **Single-use**: The pending row is deleted in the same transaction that creates the user. Requesting signup again
+  replaces the pending row, invalidating any previously emailed token.
+- **Database compromise**: Token storage is hashed (SHA-256) — stolen rows cannot be turned into valid confirmation
+  links.
 - **Account enumeration**: Signup always returns the same generic message regardless of whether the email exists: *"Se
   ha enviado un email de verificación a ..."*
 - **Rate limiting**: Signup (5 req/10s per IP) and Confirm (100 req/10s per IP) are rate-limited via Bucket4j.
 - **Expired/invalid token**: Both the landing page (GET) and confirmation (POST) catch all exceptions and show a generic
   error message.
+
+## Revision (2026-09): opaque token + pending_registrations replace JWT with embedded hash
+
+The original design carried the BCrypt hash inside the verification JWT (only Base64-encoded, not encrypted) because
+the account is not created until confirmation, so the hash had to "travel" in the token. This exposed the hash to
+email interception and link-scanning gateways. The pending registration now lives server-side and the email carries
+only an opaque random token, following the OWASP Forgot Password Cheat Sheet pattern (CSPRNG tokens, stored hashed,
+single use).
+
+Files modified in this revision:
+
+- `db/migration/V1__initial_schema.sql` — new `pending_registrations` table (early-phase project: schema is reset and
+  migrations edited in place, no V9 added)
+- `db/migration/V2__add_unique_constraints.sql` — functional unique indexes `LOWER(username)` / `LOWER(email)`
+- `db/migration/V7__enable_rls_on_tables.sql` — RLS enabled on the new table
+- `entity/PendingRegistration.java` (new), `repo/PendingRegistrationRepository.java` (new)
+- `service/PendingRegistrationService.java` (new) — token generation, lookup, lifecycle
+- `service/JwtService.java` — verification token generation/extraction removed
+- `service/AuthService.java` — `signup()` stores the pending registration
+- `service/VerificationService.java` — consumes the pending row instead of JWT claims
+- `util/TokenType.java` — `VERIFY_EMAIL` constant removed
 
 ## Files Modified/Created
 

@@ -77,21 +77,21 @@ class AdminServiceTest {
 
     private User createUser(Long id, String username) {
         User user = User.builder()
-            .username(username)
-            .email(username + "@email.com")
-            .passwordHash("hash")
-            .zoneInfo("UTC")
-            .addRole(User.UserRole.ROLE_USER)
-            .build();
+                .username(username)
+                .email(username + "@email.com")
+                .passwordHash("hash")
+                .zoneInfo("UTC")
+                .addRole(User.UserRole.ROLE_USER)
+                .build();
         user.setId(id);
         return user;
     }
 
     private Deck createDeck(Long id, String name, User owner) {
         Deck deck = Deck.builder()
-            .name(name)
-            .user(owner)
-            .build();
+                .name(name)
+                .user(owner)
+                .build();
         deck.setId(id);
         deck.setCreatedAt(Instant.now());
         deck.setUpdatedAt(Instant.now());
@@ -100,10 +100,10 @@ class AdminServiceTest {
 
     private Card createCard(Long id, String front, Deck deck) {
         Card card = Card.builder()
-            .front(front)
-            .back("back")
-            .deck(deck)
-            .build();
+                .front(front)
+                .back("back")
+                .deck(deck)
+                .build();
         card.setId(id);
         card.setNextReviewDate(Instant.now());
         return card;
@@ -116,7 +116,7 @@ class AdminServiceTest {
     class GetAllUsers {
 
         private final CursorPaginationRequest request =
-            CursorPaginationRequest.forUsers(null, null, 15, Sort.Direction.DESC);
+                CursorPaginationRequest.forUsers(null, null, 15, Sort.Direction.DESC);
 
         @Test
         @DisplayName("should return window of all users with correct fields")
@@ -131,14 +131,14 @@ class AdminServiceTest {
             UserResponse resp2 = new UserResponse(user2.getId(), user2.getUsername(), user2.getEmail(), user2.getZoneInfo(), user2.getCreatedAt(), user2.getLastLogin(), user2.getLastNotificationSent(), user2.getSessionThreshold(), user2.getStartOfDay(), user2.isNotificationsEnabled(), user2.getRoles().stream().map(Enum::toString).collect(Collectors.toSet()));
 
             Window<User> userWindow = Window.from(
-                List.of(user1, user2),
-                i -> ScrollPosition.keyset(),
-                false
+                    List.of(user1, user2),
+                    i -> ScrollPosition.keyset(),
+                    false
             );
 
             when(userRepo.findBy(
-                ArgumentMatchers.<Specification<User>>any(),
-                any()
+                    ArgumentMatchers.<Specification<User>>any(),
+                    any()
             )).thenReturn(userWindow);
             when(userMapper.toResponse(user1)).thenReturn(resp1);
             when(userMapper.toResponse(user2)).thenReturn(resp2);
@@ -162,14 +162,14 @@ class AdminServiceTest {
         @DisplayName("should return empty window when no users exist")
         void shouldReturnEmptyList() {
             Window<User> empty = Window.from(
-                List.of(),
-                i -> ScrollPosition.keyset(),
-                false
+                    List.of(),
+                    i -> ScrollPosition.keyset(),
+                    false
             );
 
             when(userRepo.findBy(
-                ArgumentMatchers.<Specification<User>>any(),
-                any()
+                    ArgumentMatchers.<Specification<User>>any(),
+                    any()
             )).thenReturn(empty);
 
             Window<UserResponse> result = adminService.getAllUsers(request);
@@ -183,7 +183,7 @@ class AdminServiceTest {
     class GetUserDecks {
 
         private final CursorPaginationRequest request =
-            CursorPaginationRequest.forDecks(null, null, 15, Sort.Direction.DESC);
+                CursorPaginationRequest.forDecks(null, null, 15, Sort.Direction.DESC);
 
         @Test
         @DisplayName("should return decks for given user with correct fields")
@@ -194,14 +194,15 @@ class AdminServiceTest {
             DeckResponse resp = new DeckResponse(deck.getId(), deck.getName(), deck.getHasPendingCards(), deck.getCreatedAt(), deck.getUpdatedAt());
 
             Window<Deck> deckWindow = Window.from(
-                List.of(deck),
-                i -> ScrollPosition.keyset(),
-                false
+                    List.of(deck),
+                    i -> ScrollPosition.keyset(),
+                    false
             );
 
+            when(userRepo.existsById(USER_ID)).thenReturn(true);
             when(deckRepo.findBy(
-                ArgumentMatchers.<Specification<Deck>>any(),
-                any()
+                    ArgumentMatchers.<Specification<Deck>>any(),
+                    any()
             )).thenReturn(deckWindow);
             when(deckMapper.toResponse(deck)).thenReturn(resp);
 
@@ -218,19 +219,32 @@ class AdminServiceTest {
         @DisplayName("should return empty window when user has no decks")
         void shouldReturnEmptyList() {
             Window<Deck> empty = Window.from(
-                List.of(),
-                i -> ScrollPosition.keyset(),
-                false
+                    List.of(),
+                    i -> ScrollPosition.keyset(),
+                    false
             );
 
+            when(userRepo.existsById(USER_ID)).thenReturn(true);
             when(deckRepo.findBy(
-                ArgumentMatchers.<Specification<Deck>>any(),
-                any()
+                    ArgumentMatchers.<Specification<Deck>>any(),
+                    any()
             )).thenReturn(empty);
 
             Window<DeckResponse> result = adminService.getUserDecks(USER_ID, request);
 
             assertThat(result.getContent()).isEmpty();
+        }
+
+        @Test
+        @DisplayName("should throw ResourceNotFoundException when user does not exist")
+        void shouldThrowWhenUserNotFound() {
+            when(userRepo.existsById(USER_ID)).thenReturn(false);
+
+            assertThatThrownBy(() -> adminService.getUserDecks(USER_ID, request))
+                    .isInstanceOf(ResourceNotFoundException.class)
+                    .hasMessageContaining(USER_ID.toString());
+
+            verifyNoInteractions(deckRepo);
         }
     }
 
@@ -239,7 +253,7 @@ class AdminServiceTest {
     class GetDeckCards {
 
         private final CursorPaginationRequest request =
-            CursorPaginationRequest.forDecks(null, null, 15, Sort.Direction.DESC);
+                CursorPaginationRequest.forDecks(null, null, 15, Sort.Direction.DESC);
 
         @Test
         @DisplayName("should return all cards for given deck with correct fields")
@@ -251,14 +265,15 @@ class AdminServiceTest {
             CardResponse resp = new CardResponse(card.getId(), card.getFront(), card.getBack(), card.getNextReviewDate());
 
             Window<Card> cardWindow = Window.from(
-                List.of(card),
-                i -> ScrollPosition.keyset(),
-                false
+                    List.of(card),
+                    i -> ScrollPosition.keyset(),
+                    false
             );
 
+            when(deckRepo.existsById(DECK_ID)).thenReturn(true);
             when(cardRepo.findBy(
-                ArgumentMatchers.<Specification<Card>>any(),
-                any()
+                    ArgumentMatchers.<Specification<Card>>any(),
+                    any()
             )).thenReturn(cardWindow);
             when(cardMapper.toResponse(card)).thenReturn(resp);
 
@@ -275,19 +290,32 @@ class AdminServiceTest {
         @DisplayName("should return empty window when deck has no cards")
         void shouldReturnEmptyList() {
             Window<Card> empty = Window.from(
-                List.of(),
-                i -> ScrollPosition.keyset(),
-                false
+                    List.of(),
+                    i -> ScrollPosition.keyset(),
+                    false
             );
 
+            when(deckRepo.existsById(DECK_ID)).thenReturn(true);
             when(cardRepo.findBy(
-                ArgumentMatchers.<Specification<Card>>any(),
-                any()
+                    ArgumentMatchers.<Specification<Card>>any(),
+                    any()
             )).thenReturn(empty);
 
             Window<CardResponse> result = adminService.getDeckCards(DECK_ID, request);
 
             assertThat(result.getContent()).isEmpty();
+        }
+
+        @Test
+        @DisplayName("should throw ResourceNotFoundException when deck does not exist")
+        void shouldThrowWhenDeckNotFound() {
+            when(deckRepo.existsById(DECK_ID)).thenReturn(false);
+
+            assertThatThrownBy(() -> adminService.getDeckCards(DECK_ID, request))
+                    .isInstanceOf(ResourceNotFoundException.class)
+                    .hasMessageContaining(DECK_ID.toString());
+
+            verifyNoInteractions(cardRepo);
         }
     }
 
@@ -318,8 +346,8 @@ class AdminServiceTest {
             when(cardRepo.findById(CARD_ID)).thenReturn(Optional.empty());
 
             assertThatThrownBy(() -> adminService.getCard(CARD_ID))
-                .isInstanceOf(ResourceNotFoundException.class)
-                .hasMessageContaining(CARD_ID.toString());
+                    .isInstanceOf(ResourceNotFoundException.class)
+                    .hasMessageContaining(CARD_ID.toString());
         }
     }
 
@@ -336,7 +364,7 @@ class AdminServiceTest {
 
             adminService.deleteUser(USER_ID);
 
-            verify(userRepo).deleteById(USER_ID);
+            verify(userRepo).bulkDeleteById(USER_ID);
         }
 
         @Test
@@ -345,8 +373,8 @@ class AdminServiceTest {
             when(userRepo.existsById(USER_ID)).thenReturn(false);
 
             assertThatThrownBy(() -> adminService.deleteUser(USER_ID))
-                .isInstanceOf(ResourceNotFoundException.class)
-                .hasMessageContaining(USER_ID.toString());
+                    .isInstanceOf(ResourceNotFoundException.class)
+                    .hasMessageContaining(USER_ID.toString());
 
             verify(userRepo, never()).deleteById(any());
         }
@@ -363,7 +391,7 @@ class AdminServiceTest {
 
             adminService.deleteDeck(DECK_ID);
 
-            verify(deckRepo).deleteById(DECK_ID);
+            verify(deckRepo).bulkDeleteById(DECK_ID);
         }
 
         @Test
@@ -372,8 +400,8 @@ class AdminServiceTest {
             when(deckRepo.existsById(DECK_ID)).thenReturn(false);
 
             assertThatThrownBy(() -> adminService.deleteDeck(DECK_ID))
-                .isInstanceOf(ResourceNotFoundException.class)
-                .hasMessageContaining(DECK_ID.toString());
+                    .isInstanceOf(ResourceNotFoundException.class)
+                    .hasMessageContaining(DECK_ID.toString());
 
             verify(deckRepo, never()).deleteById(any());
         }
@@ -423,8 +451,8 @@ class AdminServiceTest {
             when(cardRepo.findById(CARD_ID)).thenReturn(Optional.empty());
 
             assertThatThrownBy(() -> adminService.deleteCard(CARD_ID))
-                .isInstanceOf(ResourceNotFoundException.class)
-                .hasMessageContaining(CARD_ID.toString());
+                    .isInstanceOf(ResourceNotFoundException.class)
+                    .hasMessageContaining(CARD_ID.toString());
 
             verify(cardRepo, never()).delete(any(Card.class));
         }
@@ -434,21 +462,17 @@ class AdminServiceTest {
     @DisplayName("sendNotification")
     class SendNotification {
 
-        @BeforeEach
-        void setUp() {
-            when(clock.instant()).thenReturn(NOW);
-        }
-
         @Test
         @DisplayName("should send review reminder email when user exists")
         void shouldSendEmail() {
+            when(clock.instant()).thenReturn(NOW);
             User user = createUser(USER_ID, "alice");
             when(userRepo.findById(USER_ID)).thenReturn(Optional.of(user));
 
             adminService.sendNotification(USER_ID);
 
             verify(emailService).sendReviewReminderSync(
-                user.getEmail(), user.getUsername(), user.getId(), NOW);
+                    user.getEmail(), user.getUsername(), user.getId(), NOW);
         }
 
         @Test
@@ -457,8 +481,8 @@ class AdminServiceTest {
             when(userRepo.findById(USER_ID)).thenReturn(Optional.empty());
 
             assertThatThrownBy(() -> adminService.sendNotification(USER_ID))
-                .isInstanceOf(ResourceNotFoundException.class)
-                .hasMessageContaining("User not found");
+                    .isInstanceOf(ResourceNotFoundException.class)
+                    .hasMessageContaining("User not found");
 
             verify(emailService, never()).sendReviewReminderSync(any(), any(), any(), any());
         }
@@ -466,13 +490,32 @@ class AdminServiceTest {
         @Test
         @DisplayName("should throw RuntimeException when email delivery fails")
         void shouldThrowWhenEmailFails() {
+            when(clock.instant()).thenReturn(NOW);
             User user = createUser(USER_ID, "alice");
             when(userRepo.findById(USER_ID)).thenReturn(Optional.of(user));
             doThrow(new RuntimeException("SMTP error"))
-                .when(emailService).sendReviewReminderSync(any(), any(), any(), any());
+                    .when(emailService).sendReviewReminderSync(any(), any(), any(), any());
 
             assertThatThrownBy(() -> adminService.sendNotification(USER_ID))
-                .isInstanceOf(RuntimeException.class);
+                    .isInstanceOf(RuntimeException.class);
+        }
+    }
+
+    @Nested
+    @DisplayName("sendNotification — user unsubscribed")
+    class SendNotificationWhenUnsubscribed {
+
+        @Test
+        @DisplayName("should skip email and leave lastNotificationSent untouched when notifications are disabled")
+        void shouldSkipWhenNotificationsDisabled() {
+            User user = createUser(USER_ID, "alice");
+            user.setNotificationsEnabled(false);
+            when(userRepo.findById(USER_ID)).thenReturn(Optional.of(user));
+
+            adminService.sendNotification(USER_ID);
+
+            verify(emailService, never()).sendReviewReminderSync(any(), any(), any(), any());
+            verifyNoInteractions(clock);
         }
     }
 }

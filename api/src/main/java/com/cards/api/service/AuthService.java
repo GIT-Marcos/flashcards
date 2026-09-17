@@ -18,7 +18,10 @@ import com.cards.api.mapper.SecurityUserMapper;
 import com.cards.api.repo.UserRepository;
 import com.cards.api.service.notification.EmailService;
 import com.cards.api.util.TimeZoneUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
@@ -32,6 +35,8 @@ import java.util.Optional;
 @Service
 public class AuthService {
 
+    private static final Logger log = LoggerFactory.getLogger(AuthService.class);
+
     private final ApplicationEventPublisher eventPublisher;
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
@@ -40,10 +45,13 @@ public class AuthService {
     private final SecurityUserMapper securityUserMapper;
     private final EmailService emailService;
     private final ApplicationProperties properties;
+    private final PendingRegistrationService pendingRegistrationService;
+    private final PasswordFingerprintService passwordFingerprintService;
 
     public AuthService(ApplicationEventPublisher eventPublisher, UserRepository userRepository, PasswordEncoder passwordEncoder, JwtService jwtService,
                        AuthenticationManager authenticationManager, SecurityUserMapper securityUserMapper,
-                       EmailService emailService, ApplicationProperties properties) {
+                       EmailService emailService, ApplicationProperties properties,
+                       PendingRegistrationService pendingRegistrationService, PasswordFingerprintService passwordFingerprintService) {
         this.eventPublisher = eventPublisher;
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
@@ -52,6 +60,8 @@ public class AuthService {
         this.securityUserMapper = securityUserMapper;
         this.emailService = emailService;
         this.properties = properties;
+        this.pendingRegistrationService = pendingRegistrationService;
+        this.passwordFingerprintService = passwordFingerprintService;
     }
 
     public SignupResponse signup(RegisterRequest request) {
@@ -69,15 +79,19 @@ public class AuthService {
             throw new DuplicatedUserEmailException(request.email());
 
         String passwordHash = passwordEncoder.encode(request.password());
-        String token = jwtService.generateEmailVerificationToken(
-            request.username(), request.email(), passwordHash, zone);
-
-        String verificationUrl = properties.getNotifications().getApiUrl() + "/auth/confirm?token=" + token;
-        emailService.sendVerificationEmail(request.email(), request.username(), verificationUrl);
+        try {
+            String token = pendingRegistrationService.createPending(
+                    request.username(), request.email(), passwordHash, zone);
+            String verificationUrl = properties.getNotifications().getApiUrl() + "/auth/confirm?token=" + token;
+            emailService.sendVerificationEmail(request.email(), request.username(), verificationUrl);
+        } catch (DataIntegrityViolationException ex) {
+            log.warn("Concurrent signup won the pending registration race for email={}; no email sent for this request",
+                    request.email(), ex);
+        }
 
         return new SignupResponse(
-            "Se ha enviado un email de verificación a " + request.email()
-                + ". Revisa tu bandeja de entrada."
+                "Se ha enviado un email de verificación a " + request.email()
+                        + ". Revisa tu bandeja de entrada."
         );
     }
 
@@ -86,20 +100,19 @@ public class AuthService {
         Optional<User> userOpt = userRepository.findByEmailIgnoreCase(request.email());
         if (userOpt.isEmpty()) {
             return new ForgotPasswordResponse(
-                "If an account with that email exists, a password reset link has been sent."
+                    "If an account with that email exists, a password reset link has been sent."
             );
         }
 
         User user = userOpt.get();
-        String token = jwtService.generatePasswordResetToken(
-            user.getId(), user.getEmail(), user.getPasswordHash()
-        );
+        String fingerprint = passwordFingerprintService.compute(user.getPasswordHash());
+        String token = jwtService.generatePasswordResetToken(user.getId(), fingerprint);
 
         String resetUrl = properties.getNotifications().getAppUrl() + "/auth/reset-password?token=" + token;
         emailService.sendPasswordResetEmail(user.getEmail(), user.getUsername(), resetUrl);
 
         return new ForgotPasswordResponse(
-            "If an account with that email exists, a password reset link has been sent."
+                "If an account with that email exists, a password reset link has been sent."
         );
     }
 
@@ -109,7 +122,7 @@ public class AuthService {
 
         if (!jwtService.isResetPasswordToken(rawToken)) {
             throw new InvalidResetPasswordTokenException(
-                "The reset link is invalid or has expired. Please request a new one."
+                    "The reset link is invalid or has expired. Please request a new one."
             );
         }
 
@@ -118,18 +131,18 @@ public class AuthService {
             data = jwtService.extractResetPasswordData(rawToken);
         } catch (Exception ex) {
             throw new InvalidResetPasswordTokenException(
-                "The reset link is invalid or has expired. Please request a new one."
+                    "The reset link is invalid or has expired. Please request a new one."
             );
         }
 
         User user = userRepository.findById(data.userId())
-            .orElseThrow(() -> new InvalidResetPasswordTokenException(
-                "The reset link is invalid or has expired. Please request a new one."
-            ));
+                .orElseThrow(() -> new InvalidResetPasswordTokenException(
+                        "The reset link is invalid or has expired. Please request a new one."
+                ));
 
-        if (!user.getPasswordHash().equals(data.passwordHash())) {
+        if (!passwordFingerprintService.matches(user.getPasswordHash(), data.pwdFingerprint())) {
             throw new InvalidResetPasswordTokenException(
-                "This reset link has already been used. Please request a new one."
+                    "This reset link has already been used. Please request a new one."
             );
         }
 
@@ -138,7 +151,7 @@ public class AuthService {
         userRepository.save(user);
 
         return new ResetPasswordResponse(
-            "Your password has been successfully reset. You can now log in with your new password."
+                "Your password has been successfully reset. You can now log in with your new password."
         );
     }
 
@@ -146,12 +159,12 @@ public class AuthService {
     public AuthResponse login(LoginRequest request, String zoneInfo) {
         // 1. Autenticar usando el AuthenticationManager de Spring
         authenticationManager.authenticate(
-            new UsernamePasswordAuthenticationToken(request.username(), request.password())
+                new UsernamePasswordAuthenticationToken(request.username(), request.password())
         );
 
         // 2. Si llegamos aquí, las credenciales son correctas
         User user = userRepository.findByUsernameIgnoreCase(request.username())
-            .orElseThrow(() -> new UsernameNotFoundException("User not found"));
+                .orElseThrow(() -> new UsernameNotFoundException("User not found"));
 
         // 3. Generar el accessToken con el userId incluido
         SecurityUser securityUser = securityUserMapper.toSecurityUser(user);
@@ -163,7 +176,7 @@ public class AuthService {
 
         // 5. Si el header Time-Zone viene y es distinto al actual, publicar evento de actualización
         if (zoneInfo != null && !zoneInfo.isBlank() && TimeZoneUtils.isValid(zoneInfo)
-            && !zoneInfo.equals(user.getZoneInfo())) {
+                && !zoneInfo.equals(user.getZoneInfo())) {
             eventPublisher.publishEvent(new UserTimeZoneUpdateEvent(user.getUsername(), zoneInfo));
         }
 
@@ -183,7 +196,7 @@ public class AuthService {
         try {
             final String username = jwtService.extractUsername(refreshToken);
             var user = userRepository.findByUsernameIgnoreCase(username)
-                .orElseThrow(() -> new InvalidRefreshTokenException("Invalid refresh token"));
+                    .orElseThrow(() -> new InvalidRefreshTokenException("Invalid refresh token"));
 
             SecurityUser securityUser = securityUserMapper.toSecurityUser(user);
 

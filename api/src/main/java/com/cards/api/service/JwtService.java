@@ -40,12 +40,12 @@ public class JwtService {
         Date now = Date.from(clock.instant());
 
         return Jwts.builder()
-            .claims(extraClaims)
-            .subject(userDetails.getUsername())
-            .issuedAt(now)
-            .expiration(new Date(now.getTime() + expiration))
-            .signWith(getSignInKey(), Jwts.SIG.HS256)
-            .compact();
+                .claims(extraClaims)
+                .subject(userDetails.getUsername())
+                .issuedAt(now)
+                .expiration(new Date(now.getTime() + expiration))
+                .signWith(getSignInKey(), Jwts.SIG.HS256)
+                .compact();
     }
 
     public String generateToken(SecurityUser securityUser) {
@@ -63,69 +63,37 @@ public class JwtService {
 
         Date now = Date.from(clock.instant());
         return Jwts.builder()
-            .claims(extraClaims)
-            .subject("unsubscribe:" + userId)
-            .issuedAt(now)
-            .expiration(new Date(now.getTime() + properties.getNotifications().getUnsubscribeTokenExpiration()))
-            .signWith(getSignInKey(), Jwts.SIG.HS256)
-            .compact();
+                .claims(extraClaims)
+                .subject("unsubscribe:" + userId)
+                .issuedAt(now)
+                .expiration(new Date(now.getTime() + properties.getNotifications().getUnsubscribeTokenExpiration()))
+                .signWith(getSignInKey(), Jwts.SIG.HS256)
+                .compact();
     }
 
-    public String generateEmailVerificationToken(String username, String email, String passwordHash, String zoneInfo) {
-        Map<String, Object> extraClaims = new HashMap<>();
-        extraClaims.put("tokenType", TokenType.VERIFY_EMAIL);
-        extraClaims.put("email", email);
-        extraClaims.put("passwordHash", passwordHash);
-        extraClaims.put("zoneInfo", zoneInfo);
-
-        Date now = Date.from(clock.instant());
-        return Jwts.builder()
-            .claims(extraClaims)
-            .subject(username)
-            .issuedAt(now)
-            .expiration(new Date(now.getTime() + properties.getSecurity().getVerificationTokenExpiration()))
-            .signWith(getSignInKey(), Jwts.SIG.HS256)
-            .compact();
-    }
-
-    public String generatePasswordResetToken(Long userId, String email, String passwordHash) {
+    public String generatePasswordResetToken(Long userId, String pwdFingerprint) {
         Map<String, Object> extraClaims = new HashMap<>();
         extraClaims.put("tokenType", TokenType.PASSWORD_RESET);
-        extraClaims.put("email", email);
-        extraClaims.put("passwordHash", passwordHash);
+        extraClaims.put("pwdFingerprint", pwdFingerprint);
 
         Date now = Date.from(clock.instant());
         return Jwts.builder()
-            .claims(extraClaims)
-            .subject(String.valueOf(userId))
-            .issuedAt(now)
-            .expiration(new Date(now.getTime() + properties.getSecurity().getResetTokenExpiration()))
-            .signWith(getSignInKey(), Jwts.SIG.HS256)
-            .compact();
+                .claims(extraClaims)
+                .subject(String.valueOf(userId))
+                .issuedAt(now)
+                .expiration(new Date(now.getTime() + properties.getSecurity().getResetTokenExpiration()))
+                .signWith(getSignInKey(), Jwts.SIG.HS256)
+                .compact();
     }
 
-    public record VerifyData(String username, String email, String passwordHash, String zoneInfo) {
-    }
-
-    public VerifyData extractVerificationData(String token) {
-        Claims claims = extractAllClaims(token);
-        return new VerifyData(
-            claims.getSubject(),
-            claims.get("email", String.class),
-            claims.get("passwordHash", String.class),
-            claims.get("zoneInfo", String.class)
-        );
-    }
-
-    public record ResetPasswordData(Long userId, String email, String passwordHash) {
+    public record ResetPasswordData(Long userId, String pwdFingerprint) {
     }
 
     public ResetPasswordData extractResetPasswordData(String token) {
         Claims claims = extractAllClaims(token);
         return new ResetPasswordData(
-            Long.valueOf(claims.getSubject()),
-            claims.get("email", String.class),
-            claims.get("passwordHash", String.class)
+                Long.valueOf(claims.getSubject()),
+                claims.get("pwdFingerprint", String.class)
         );
     }
 
@@ -151,8 +119,8 @@ public class JwtService {
 
     public Claims extractAllClaims(String token) {
         return buildParser()
-            .parseSignedClaims(token)
-            .getPayload();
+                .parseSignedClaims(token)
+                .getPayload();
     }
 
     public boolean isTokenType(String token, String expectedType) {
@@ -174,9 +142,9 @@ public class JwtService {
 
     private JwtParser buildParser() {
         return Jwts.parser()
-            .clock(() -> Date.from(clock.instant()))
-            .verifyWith(getSignInKey())
-            .build();
+                .clock(() -> Date.from(clock.instant()))
+                .verifyWith(getSignInKey())
+                .build();
     }
 
     private boolean isTokenExpired(String token) {

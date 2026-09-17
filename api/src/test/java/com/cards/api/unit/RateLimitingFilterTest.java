@@ -102,12 +102,12 @@ class RateLimitingFilterTest {
             }
 
             assertThatThrownBy(() -> filter.doFilter(request, response, filterChain))
-                .isInstanceOf(TooManyRequestsException.class)
-                .hasMessageContaining("Too many requests")
-                .satisfies(ex -> {
-                    TooManyRequestsException e = (TooManyRequestsException) ex;
-                    assertThat(e.getRetryAfterSeconds()).isEqualTo(10);
-                });
+                    .isInstanceOf(TooManyRequestsException.class)
+                    .hasMessageContaining("Too many requests")
+                    .satisfies(ex -> {
+                        TooManyRequestsException e = (TooManyRequestsException) ex;
+                        assertThat(e.getRetryAfterSeconds()).isEqualTo(10);
+                    });
         }
 
         @Test
@@ -127,16 +127,27 @@ class RateLimitingFilterTest {
         }
 
         @Test
-        @DisplayName("should use X-Forwarded-For header when present")
-        void shouldUseXForwardedFor() throws ServletException, IOException {
+        @DisplayName("should ignore X-Forwarded-For header and key buckets by remote address")
+        void shouldIgnoreXForwardedFor() throws ServletException, IOException {
+            MockHttpServletResponse response = new MockHttpServletResponse();
+
+            for (int i = 1; i <= 3; i++) {
+                MockHttpServletRequest request = new MockHttpServletRequest();
+                request.setServletPath("/auth/login");
+                request.setRemoteAddr("192.168.1.1");
+                request.addHeader("X-Forwarded-For", i + ".1.1.1");
+                filter.doFilter(request, response, filterChain);
+            }
+            verify(filterChain, org.mockito.Mockito.times(3)).doFilter(
+                    org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any());
+
             MockHttpServletRequest request = new MockHttpServletRequest();
             request.setServletPath("/auth/login");
-            request.addHeader("X-Forwarded-For", "10.0.0.1, 192.168.1.1");
+            request.setRemoteAddr("192.168.1.1");
+            request.addHeader("X-Forwarded-For", "9.9.9.9");
 
-            MockHttpServletResponse response = new MockHttpServletResponse();
-            filter.doFilter(request, response, filterChain);
-
-            verify(filterChain).doFilter(request, response);
+            assertThatThrownBy(() -> filter.doFilter(request, response, filterChain))
+                    .isInstanceOf(TooManyRequestsException.class);
         }
     }
 
@@ -168,11 +179,11 @@ class RateLimitingFilterTest {
             }
 
             assertThatThrownBy(() -> filter.doFilter(request, response, filterChain))
-                .isInstanceOf(TooManyRequestsException.class)
-                .satisfies(ex -> {
-                    TooManyRequestsException e = (TooManyRequestsException) ex;
-                    assertThat(e.getRetryAfterSeconds()).isEqualTo(10);
-                });
+                    .isInstanceOf(TooManyRequestsException.class)
+                    .satisfies(ex -> {
+                        TooManyRequestsException e = (TooManyRequestsException) ex;
+                        assertThat(e.getRetryAfterSeconds()).isEqualTo(10);
+                    });
         }
     }
 
@@ -204,11 +215,11 @@ class RateLimitingFilterTest {
             }
 
             assertThatThrownBy(() -> filter.doFilter(request, response, filterChain))
-                .isInstanceOf(TooManyRequestsException.class)
-                .satisfies(ex -> {
-                    TooManyRequestsException e = (TooManyRequestsException) ex;
-                    assertThat(e.getRetryAfterSeconds()).isEqualTo(10);
-                });
+                    .isInstanceOf(TooManyRequestsException.class)
+                    .satisfies(ex -> {
+                        TooManyRequestsException e = (TooManyRequestsException) ex;
+                        assertThat(e.getRetryAfterSeconds()).isEqualTo(10);
+                    });
         }
     }
 

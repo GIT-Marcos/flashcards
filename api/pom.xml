@@ -88,6 +88,11 @@
             <version>8.10.1</version>
         </dependency>
 
+        <dependency>
+            <groupId>com.github.ben-manes.caffeine</groupId>
+            <artifactId>caffeine</artifactId>
+        </dependency>
+
         <!-- ========== USER NOTIFICATION ========== -->
 
         <dependency>

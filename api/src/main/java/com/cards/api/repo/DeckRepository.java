@@ -24,6 +24,15 @@ public interface DeckRepository extends JpaRepository<Deck, Long>, JpaSpecificat
     int bulkUpdateHasPendingCardsForUsers(@Param("userIds") List<Long> userIds, @Param("now") Instant now);
     // Usuarios con tarjetas pendientes
 
+    /**
+     * Borrado físico en una única sentencia. El cascado a cards lo ejecuta la BD
+     * (ON DELETE CASCADE); la nullificación de card_review_log.card_id, el ON DELETE SET NULL.
+     * Ver SDD §6.5 "Borrado de Datos".
+     */
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("DELETE FROM Deck d WHERE d.id = :id")
+    int bulkDeleteById(@Param("id") Long id);
+
     List<Deck> findAllByUserId(Long userId);
 
     Optional<Deck> findByIdAndUserId(Long deckId, Long userId);

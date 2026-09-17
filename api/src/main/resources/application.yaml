@@ -28,6 +28,10 @@ spring:
       max-lifetime: 1800000
       initialization-fail-timeout: 1
 
+# SERVER
+server:
+  forward-headers-strategy: native
+
 # MAILEROO
 maileroo:
   api-key: ${MAILEROO_API_KEY}
@@ -43,6 +47,7 @@ application:
         expiration: 604800000
     verification-token-expiration: 86400000
     reset-token-expiration: 900000
+    pwd-fingerprint-secret: ${PWD_FINGERPRINT_SECRET}
 
   # NOTIFICATIONS
   notifications:
@@ -102,6 +107,9 @@ rate-limiter:
       capacity: 5
       refill-tokens: 1
       refill-period: 60s
+  cache:
+    maximum-size: 100000
+    expire-after-access: 1h
 
 # ---- ASYNC (threads for 512 MB RAM) ----
 app:

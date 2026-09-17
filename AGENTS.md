@@ -49,10 +49,12 @@ La documentación es la fuente de verdad a partir de la cual se implementa el c�
 - Credentials: `postgres:password`, DB: `flashcards_db`
 - Migrations: Flyway (check `src/main/resources/db/migration`)
 - V1-V8: shared across all profiles (`db/migration/`)
+    - V1: incluye tabla `pending_registrations` (verificación de email — guarda SHA-256 del token opaco + datos del
+      registro pendiente, TTL 24h)
     - V6: seed de datos de prueba (1 usuario `test_user` con 7 decks, ~83 cards, 5 sesiones, ~72 reviews)
     - V8: tabla `user_api_keys` para API keys cifradas de proveedores IA
 - V5 uses Flyway placeholders (`${ADMIN_USERNAME}`, `${ADMIN_EMAIL}`, etc.) resolved from each profile's YAML
-    - See `application-dev.template.yaml` for the required dev configuration (copy to `application-dev.yaml`)
+    - Dev config: ver `.env.example` — variables inyectadas por el IDE vía `.env`
 
 # Deployment Profiles
 
@@ -62,7 +64,7 @@ La documentación es la fuente de verdad a partir de la cual se implementa el c�
 | `prod`          | `application-prod.yaml` | Full production                       |
 
 See [`.env.example`](.env.example) for the full list with descriptions and defaults.
-Required for `prod`: `DB_URL`, `DB_USER`, `DB_PASSWORD`, `JWT_SECRET_KEY`, `ADMIN_USERNAME`,
+Required for `prod`: `DB_URL`, `DB_USER`, `DB_PASSWORD`, `JWT_SECRET_KEY`, `PWD_FINGERPRINT_SECRET`, `ADMIN_USERNAME`,
 `ADMIN_EMAIL`, `ADMIN_PSW_HASH`, `ADMIN_ZONE`, `ALLOWED_ORIGINS`, `MAILEROO_API_KEY`, `MAILEROO_WEBHOOK_SECRET`,
 `APP_URL`
 
@@ -85,7 +87,7 @@ Required for `prod`: `DB_URL`, `DB_USER`, `DB_PASSWORD`, `JWT_SECRET_KEY`, `ADMI
 |--------|-------------------------|-------------------------|--------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------|
 | `POST` | `/auth/signup`          | `RegisterRequest`       | `SignupResponse` (202)         | `@Valid`: username 4-50 chars, password 8-20 with complexity regex, valid IANA zone. Sends verification email — no account created until confirmation |
 | `GET`  | `/auth/confirm`         | Query param `token`     | HTML page (200)                | Shows "Confirm Email" button (Thymeleaf)                                                                                                              |
-| `POST` | `/auth/confirm`         | Form param `token`      | HTML page (200)                | Validates JWT, creates user, shows result page (Thymeleaf)                                                                                            |
+| `POST` | `/auth/confirm`         | Form param `token`      | HTML page (200)                | Validates token (pending row lookup by SHA-256), creates user, shows result page (Thymeleaf)                                                          |
 | `POST` | `/auth/login`           | `LoginRequest`          | `AuthResponse` (200)           | Authenticate via username/password                                                                                                                    |
 | `POST` | `/auth/refresh-token`   | Cookie `refresh_token`  | `AuthResponse` (200)           | Exchange refresh cookie for new token pair                                                                                                            |
 | `POST` | `/auth/logout`          | —                       | `Void` (204)                   | Clears refresh token cookie                                                                                                                           |

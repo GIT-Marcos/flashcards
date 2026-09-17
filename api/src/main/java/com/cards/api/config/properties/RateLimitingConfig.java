@@ -19,12 +19,22 @@ public class RateLimitingConfig {
 
     private Auth auth;
 
+    private CacheConfig cache = new CacheConfig();
+
     public Auth getAuth() {
         return auth;
     }
 
     public void setAuth(Auth auth) {
         this.auth = auth;
+    }
+
+    public CacheConfig getCache() {
+        return cache;
+    }
+
+    public void setCache(CacheConfig cache) {
+        this.cache = cache;
     }
 
     /**
@@ -161,6 +171,38 @@ public class RateLimitingConfig {
 
         public void setRefillPeriod(Duration refillPeriod) {
             this.refillPeriod = refillPeriod;
+        }
+    }
+
+    /**
+     * Bounds for the in-memory bucket cache: hard entry cap and idle expiration.
+     * <p>
+     * Bound to {@code rate-limiter.cache.*}. Defaults keep the TTL above the slowest endpoint's full-refill
+     * time, so evicting an idle bucket never grants extra capacity.
+     */
+    @Validated
+    public static class CacheConfig {
+
+        @Min(1)
+        private long maximumSize = 100_000;
+
+        @NotNull
+        private Duration expireAfterAccess = Duration.ofHours(1);
+
+        public long getMaximumSize() {
+            return maximumSize;
+        }
+
+        public void setMaximumSize(long maximumSize) {
+            this.maximumSize = maximumSize;
+        }
+
+        public Duration getExpireAfterAccess() {
+            return expireAfterAccess;
+        }
+
+        public void setExpireAfterAccess(Duration expireAfterAccess) {
+            this.expireAfterAccess = expireAfterAccess;
         }
     }
 }

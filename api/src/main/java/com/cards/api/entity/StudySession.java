@@ -39,6 +39,12 @@ public class StudySession extends BaseEntity {
     @JoinColumn(name = "user_id", nullable = false)
     private User user;
 
+    /**
+     * orphanRemoval = true implica cascade REMOVE: si algún día se elimina una StudySession
+     * por JPA, se llevará por delante sus logs. Hoy no ocurre porque las sesiones solo se
+     * borran por cascada de la BD al eliminar el usuario. Revisar antes de añadir cualquier
+     * borrado de sesión (ver SDD §6.5 "Borrado de Datos").
+     */
     @OneToMany(mappedBy = "studySession", orphanRemoval = true)
     private Set<CardReviewLog> logs = new HashSet<>();
 
